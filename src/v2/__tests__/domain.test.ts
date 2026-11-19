@@ -24,7 +24,8 @@ import {
 } from '../domain/save';
 import {
   ENEMIES,
-  RIVER_REGION,
+  REGIONS,
+  REGION_ORDER,
   applyEventChoice,
   completeNode,
   createRegionRun,
@@ -151,17 +152,21 @@ describe('内容白名单', () => {
     for (const link of LINKS) expect(link.requires.length).toBeGreaterThan(0);
   });
 
-  it('区域定义 5 节点、Boss 指向正确、敌人可查', () => {
-    expect(RIVER_REGION.nodes).toHaveLength(5);
-    expect(RIVER_REGION.nodes[4].type).toBe('boss');
-    expect(RIVER_REGION.nodes[4].enemyId).toBe(RIVER_REGION.bossId);
-    expect(ENEMIES[RIVER_REGION.bossId].kind).toBe('boss');
+  it('五个区域均为 5 节点、Boss 指向正确、敌人可查', () => {
+    expect(REGION_ORDER).toHaveLength(5);
+    for (const id of REGION_ORDER) {
+      const region = REGIONS[id];
+      expect(region.nodes).toHaveLength(5);
+      expect(region.nodes[4].type).toBe('boss');
+      expect(region.nodes[4].enemyId).toBe(region.bossId);
+      expect(ENEMIES[region.bossId]?.kind).toBe('boss');
+    }
   });
 });
 
 describe('区域 run', () => {
   it('事件选择只生效一次，并修改开局共鸣/材料', () => {
-    let run = createRegionRun('seed-1');
+    let run = createRegionRun('river', 'seed-1');
     expect(currentNode(run).type).toBe('event');
     run = applyEventChoice(run, 'ev_fog_lamp', 'light');
     expect(run.startResonance).toBe(4);
@@ -171,7 +176,7 @@ describe('区域 run', () => {
   });
 
   it('节点推进与 Boss 完成', () => {
-    let run = createRegionRun('seed-2');
+    let run = createRegionRun('river', 'seed-2');
     run = applyEventChoice(run, 'ev_fog_lamp', 'dark');
     expect(run.materials).toBe(2);
     run = completeNode(run, { materials: 1, tokens: 0 });
@@ -199,6 +204,49 @@ describe('存档 v2 / v1 迁移', () => {
     expect(persistSave(save)).toBe(true);
     const loaded = loadSave();
     expect(loaded.collection).toHaveLength(3);
+    expect(loaded.regionRuns).toEqual({});
+    expect(loaded.quests).toEqual({});
+    expect(loaded.stats.nodeXpCounts).toEqual({});
+  });
+
+  it('Batch 1 旧存档（无 regionRuns/quests/成长字段）可迁移读取', () => {
+    const base = createDefaultSave(1);
+    const legacy = {
+      ...base,
+      run: {
+        regionId: 'river',
+        seed: 'old',
+        nodeIndex: 2,
+        materials: 3,
+        tokens: 0,
+        completed: false,
+        startResonance: 2,
+        eventChoices: {},
+        log: [],
+      },
+      regionRuns: undefined,
+      activeRegionId: undefined,
+      unlockedRegions: undefined,
+      bondPoints: undefined,
+      quests: undefined,
+      stats: undefined,
+      collection: base.collection.map((item) => {
+        const { level, xp, evolutionHistory, bondXp, evolutionBase, ...rest } = item;
+        void level;
+        void xp;
+        void evolutionHistory;
+        void bondXp;
+        void evolutionBase;
+        return rest;
+      }),
+    };
+    const migrated = validateSave(JSON.parse(JSON.stringify(legacy)));
+    expect(migrated).not.toBeNull();
+    expect(migrated!.regionRuns.river?.nodeIndex).toBe(2);
+    expect(migrated!.activeRegionId).toBe('river');
+    expect(migrated!.collection[0].level).toBe(1);
+    expect(migrated!.bondPoints).toBe(0);
+    expect(migrated!.stats.battles).toBe(0);
   });
 
   it('v1 图鉴迁移：旧卡只读保留、备份写入、v2 键生成', () => {
@@ -247,3 +295,4 @@ describe('存档 v2 / v1 迁移', () => {
     expect(importSave('not json')).toBeNull();
   });
 });
+

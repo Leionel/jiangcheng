@@ -1,327 +1,340 @@
 import type { CSSProperties } from 'react';
-import type { RegionRunState } from '../domain/types';
-import { RIVER_REGION, nodeProgress, regionComplete } from '../domain/region';
+import type { RegionId, SaveV2 } from '../domain/types';
+import { REGIONS, REGION_ORDER, getEnemy } from '../domain/region';
 
-const CITY_REGIONS = [
-  { id: 'zao', name: '过早巷', x: 14, y: 14, color: '#c58b25', note: '余温 / 市井' },
-  { id: 'bridge', name: '桥影工坊', x: 27, y: 76, color: '#6b5b4e', note: '连接 / 断路' },
-  { id: 'sakura', name: '樱语山坡', x: 84, y: 12, color: '#c06b82', note: '树影 / 记忆' },
-  { id: 'thunder', name: '雷鸣创想站', x: 85, y: 74, color: '#2b7570', note: '装置 / 组合' },
-];
-
-const STOPS = [
-  { x: 432, y: 196, labelSide: 'top' as const },
-  { x: 528, y: 238, labelSide: 'bottom' as const },
-  { x: 618, y: 266, labelSide: 'bottom' as const },
-  { x: 704, y: 220, labelSide: 'top' as const },
-  { x: 786, y: 176, labelSide: 'top' as const },
-];
-
-const STOP_TYPE_LABEL: Record<string, string> = {
-  event: '事件',
-  battle: '战斗',
-  elite: '精英',
-  boss: 'Boss',
+const POS: Record<RegionId, { x: number; y: number; labelX: number; labelY: number }> = {
+  river: { x: 600, y: 390, labelX: 600, labelY: 246 },
+  zao: { x: 185, y: 150, labelX: 185, labelY: 34 },
+  bridge: { x: 255, y: 560, labelX: 255, labelY: 646 },
+  sakura: { x: 985, y: 160, labelX: 985, labelY: 36 },
+  thunder: { x: 965, y: 565, labelX: 965, labelY: 646 },
 };
 
-function stopState(index: number, current: number, done: boolean): 'done' | 'current' | 'locked' {
-  if (done || index < current) return 'done';
-  if (index === current) return 'current';
-  return 'locked';
+function regionStatus(save: SaveV2, id: RegionId): { label: string; state: 'locked' | 'ready' | 'active' | 'done' } {
+  const run = save.regionRuns[id];
+  if (run?.completed) return { label: '已观测', state: 'done' };
+  if (run) return { label: `进行中 ${Math.min(run.nodeIndex + 1, REGIONS[id].nodes.length)}/${REGIONS[id].nodes.length}`, state: 'active' };
+  if (save.unlockedRegions.includes(id)) return { label: '可探索', state: 'ready' };
+  return { label: '未解锁', state: 'locked' };
 }
 
-function toPercent(x: number, y: number) {
-  return { left: `${(x / 1200) * 100}%`, top: `${(y / 400) * 100}%` } as CSSProperties;
-}
-
-export function JiangchengMap({ run }: { run: RegionRunState }) {
-  const done = regionComplete(run);
-  const current = run.nodeIndex;
-  const progress = nodeProgress(run);
-  const routePoints = STOPS.map((stop) => `${stop.x} ${stop.y}`).join(' ');
-
+export function JiangchengMap({
+  save,
+  selectedRegionId,
+  onSelect,
+}: {
+  save: SaveV2;
+  selectedRegionId: RegionId;
+  onSelect: (id: RegionId) => void;
+}) {
   return (
-    <div className="v2-map-wrap">
-      <div className="v2-map-wide">
-        <div className="v2-map-head">
-          <div>
-            <b>江风渡口 · 渡运观测图</b>
-            <span>虚构观测 · 五站航线 · 潮位上涨</span>
-          </div>
-          <div className="v2-map-legend" aria-hidden="true">
-            <span data-kind="route">渡口路线</span>
-            <span data-kind="river">江流</span>
-            <span data-kind="locked">未开放区域</span>
-          </div>
+    <div className="v2-world-wrap">
+      <div className="v2-map-head">
+        <div>
+          <b>江城全图 · 五区观测</b>
+          <span>虚构城市 · 一条江、五块地、五种锅气与电光</span>
         </div>
-        <div className="v2-city-map">
-          <svg viewBox="0 0 1200 400" preserveAspectRatio="none" aria-hidden="true" className="v2-map-svg">
-            <defs>
-              <pattern id="v2-land-dots" width="22" height="22" patternUnits="userSpaceOnUse">
-                <circle cx="3" cy="4" r="0.9" fill="#14212b" fillOpacity="0.09" />
-              </pattern>
-            </defs>
-
-            {/* 两片陆地 */}
-            <path d="M-20 128 C 170 70 360 196 560 168 S 900 64 1220 112 L1220 -20 L-20 -20 Z" fill="#e9e5d8" />
-            <path
-              d="M-20 128 C 170 70 360 196 560 168 S 900 64 1220 112 L1220 -20 L-20 -20 Z"
-              fill="url(#v2-land-dots)"
-            />
-            <path d="M-20 286 C 190 226 380 320 620 284 S 960 202 1220 246 L1220 420 L-20 420 Z" fill="#eeeadd" />
-            <path
-              d="M-20 286 C 190 226 380 320 620 284 S 960 202 1220 246 L1220 420 L-20 420 Z"
-              fill="url(#v2-land-dots)"
-              opacity="0.7"
-            />
-
-            {/* 江流底色 */}
-            <path
-              d="M-20 128 C 170 70 360 196 560 168 S 900 64 1220 112 L1220 246 C 960 202 800 300 620 284 S 190 226 -20 286 Z"
-              fill="#dbe8ed"
-            />
-
-            {/* 江面手绘水纹：不再用规则网点，改成长短不一的墨线 */}
-            <g stroke="#1b4e75" fill="none" strokeLinecap="round" opacity="0.5">
-              <path d="M40 182 q 26 -10 52 0 t 52 0" strokeWidth="1.6" />
-              <path d="M170 206 q 20 -8 40 0 t 40 0" strokeWidth="1.3" opacity="0.7" />
-              <path d="M300 216 q 24 -9 48 0" strokeWidth="1.4" opacity="0.6" />
-              <path d="M420 244 q 22 -8 44 0 t 44 0" strokeWidth="1.6" />
-              <path d="M560 250 q 26 -10 52 0 t 52 0" strokeWidth="1.4" opacity="0.75" />
-              <path d="M700 236 q 20 -8 40 0 t 40 0" strokeWidth="1.5" opacity="0.65" />
-              <path d="M840 196 q 24 -9 48 0 t 48 0" strokeWidth="1.6" opacity="0.8" />
-              <path d="M1000 180 q 22 -8 44 0" strokeWidth="1.3" opacity="0.6" />
-              <path d="M1080 210 q 20 -8 40 0" strokeWidth="1.2" opacity="0.45" />
-              <path d="M120 240 q 18 -7 36 0" strokeWidth="1.2" opacity="0.45" />
-            </g>
-
-            {/* 河岸线 */}
-            <path
-              d="M-20 128 C 170 70 360 196 560 168 S 900 64 1220 112"
-              fill="none"
-              stroke="#1b4e75"
-              strokeOpacity="0.6"
-              strokeWidth="2.5"
-            />
-            <path
-              d="M-20 286 C 190 226 380 320 620 284 S 960 202 1220 246"
-              fill="none"
-              stroke="#1b4e75"
-              strokeOpacity="0.6"
-              strokeWidth="2.5"
-            />
-
-            {/* 支流 */}
-            <path
-              d="M742 0 C 736 56 726 96 706 136 C 690 168 688 200 704 220"
-              fill="none"
-              stroke="#dbe8ed"
-              strokeWidth="30"
-            />
-            <path
-              d="M742 0 C 736 56 726 96 706 136 C 690 168 688 200 704 220"
-              fill="none"
-              stroke="#1b4e75"
-              strokeOpacity="0.5"
-              strokeWidth="2"
-              strokeDasharray="7 6"
-            />
-
-            {/* 五区色彩：低饱和色块提示区域气质，不画硬边界 */}
-            <g opacity="0.55">
-              <path d="M48 52 C 92 34 148 36 190 54 C 214 64 210 90 184 100 C 144 116 90 110 60 96 C 40 86 34 62 48 52 Z" fill="#c58b25" fillOpacity="0.14" />
-              <path d="M236 300 C 278 286 330 288 356 304 C 374 316 366 338 340 344 C 300 354 256 348 238 334 C 226 324 224 308 236 300 Z" fill="#6b5b4e" fillOpacity="0.12" />
-              <path d="M930 30 C 978 16 1040 22 1072 42 C 1092 56 1082 78 1052 86 C 1008 98 954 90 930 74 C 914 62 914 40 930 30 Z" fill="#c06b82" fillOpacity="0.12" />
-              <path d="M930 292 C 976 280 1032 286 1060 304 C 1078 316 1070 336 1042 342 C 1002 352 952 346 932 330 C 918 318 918 302 930 292 Z" fill="#2b7570" fillOpacity="0.1" />
-            </g>
-
-            {/* 等高线：只留几笔，避免地图变成草稿堆 */}
-            <g fill="none" stroke="#14212b" strokeOpacity="0.12" strokeWidth="1.2">
-              <path d="M60 62 q 80 -18 150 8 t 130 6" />
-              <path d="M40 84 q 90 -14 160 10 t 150 4" />
-              <path d="M60 336 q 90 -18 160 6 t 140 0" />
-              <path d="M980 320 q 70 -8 130 8" />
-            </g>
-
-            {/* 桥一：单拱石桥 */}
-            <g stroke="#14212b" fill="none" opacity="0.75">
-              <path d="M248 190 H 354" strokeWidth="3" />
-              <path d="M248 182 H 354" strokeWidth="1.4" strokeOpacity="0.55" />
-              <path d="M264 190 Q 301 146 338 190" strokeWidth="2.6" />
-              <path d="M278 172 v 18 M 301 158 v 32 M 324 172 v 18" strokeWidth="1.2" strokeOpacity="0.7" />
-              <path d="M248 190 v 58 M 301 190 v 58 M 354 190 v 58" strokeWidth="2.4" />
-              <path d="M240 248 h 122" strokeWidth="2" strokeOpacity="0.4" />
-            </g>
-
-            {/* 桥二：斜拉桥 */}
-            <g stroke="#14212b" fill="none" opacity="0.75">
-              <path d="M812 210 L 952 210" strokeWidth="3" />
-              <path d="M812 202 L 952 202" strokeWidth="1.2" strokeOpacity="0.5" />
-              <path d="M836 210 L 836 132 M 928 210 L 928 132" strokeWidth="3" />
-              <path d="M836 140 L 872 210 M 836 156 L 892 210 M 836 172 L 912 210" strokeWidth="1" strokeOpacity="0.7" />
-              <path d="M928 140 L 892 210 M 928 156 L 872 210 M 928 172 L 852 210" strokeWidth="1" strokeOpacity="0.7" />
-              <path d="M812 210 L 812 258 M 952 210 L 952 258" strokeWidth="2.6" />
-              <path d="M804 258 h156" strokeWidth="2" strokeOpacity="0.45" />
-            </g>
-
-            {/* 渡口路线 */}
-            <polyline points={routePoints} fill="none" stroke="#faf8ef" strokeWidth="5" strokeOpacity="0.9" strokeLinejoin="round" />
-            <polyline
-              points={routePoints}
-              fill="none"
-              stroke="#e2402b"
-              strokeWidth="3"
-              strokeDasharray="11 8"
-              strokeLinejoin="round"
-            />
-
-            {/* 岸边木栈桥 + 船 */}
-            <g stroke="#14212b" strokeWidth="2" fill="none" opacity="0.7">
-              <path d="M500 286 h40 v10 h-40 z M512 296 v14 M528 296 v14" />
-            </g>
-            <g transform="translate(150 236) scale(1.35)" stroke="#14212b" strokeWidth="1.8" fill="none" opacity="0.75" className="v2-map-boat">
-              <path d="M-22 0 h44 l-7 13 h-30 z" />
-              <path d="M-2 0 v-14 l16 14" />
-              <path d="M-27 17 q 11 -7 22 0 t 22 0" strokeOpacity="0.5" />
-            </g>
-
-            {/* 陆地地标：放大、减少数量，让每块陆地有一个焦点 */}
-            <g stroke="#14212b" fill="none" opacity="0.55">
-              {/* 过早巷：热气小碗 + 桌 */} 
-              <g transform="translate(76 92) scale(1.5)">
-                <path d="M-14 0 h28 l-4 12 h-20 z" />
-                <path d="M-10 -6 q 4 -5 0 -10 M 0 -6 q 4 -5 0 -10 M 10 -6 q 4 -5 0 -10" strokeOpacity="0.7" />
-                <path d="M-20 16 h40" strokeOpacity="0.5" />
-              </g>
-              {/* 樱语山坡：一株樱花树 */}
-              <g transform="translate(1062 96)">
-                <path d="M0 34 v-20 M -8 20 l 8 -12 l 8 12" />
-                <circle cx="-6" cy="8" r="6" />
-                <circle cx="6" cy="4" r="5" />
-                <circle cx="10" cy="14" r="4.5" />
-                <circle cx="-10" cy="18" r="4" />
-              </g>
-              {/* 桥影工坊：拱桥剪影已在桥上，这里放一个工具箱 */}
-              <g transform="translate(250 332)">
-                <path d="M-14 0 h28 v12 h-28 z" />
-                <path d="M-6 0 v-5 h12 v5" />
-                <path d="M-14 6 h28" strokeOpacity="0.5" />
-              </g>
-              {/* 雷鸣创想站：线圈与闪电 */}
-              <g transform="translate(1050 332)">
-                <path d="M-16 0 h32 M -16 8 h32 M -16 16 h32" strokeOpacity="0.7" />
-                <path d="M-4 0 l8 18 l-6 -2 l 8 10" strokeWidth="2.4" />
-              </g>
-              {/* 风雨电台：信号塔 */}
-              <g transform="translate(790 78)">
-                <path d="M0 38 l -12 -34 h24 z" />
-                <path d="M0 4 v-10" />
-                <path d="M-18 0 q 18 -12 36 0 M -26 -12 q 26 -17 52 0" strokeOpacity="0.45" />
-              </g>
-              {/* 稀疏的树，只作点缀 */}
-              <g strokeOpacity="0.35">
-                <path d="M910 300 l 7 -14 l 7 14 z M910 300 h14" />
-                <path d="M916 300 v 6" />
-              </g>
-            </g>
-
-            {/* 罗盘与比例尺 */}
-            <g opacity="0.65">
-              <circle cx="1136" cy="52" r="22" fill="none" stroke="#14212b" strokeWidth="1.5" />
-              <path d="M1136 30 l 6 20 l -6 -5 l -6 5 z" fill="#14212b" />
-              <text x="1136" y="92" textAnchor="middle" fontSize="12.5" fill="#14212b" fontFamily="'PingFang SC', 'Microsoft YaHei', sans-serif">
-                N
-              </text>
-              <path d="M1024 360 h58 M1024 356 v8 M1053 356 v8 M1082 356 v8" stroke="#14212b" strokeWidth="1.5" />
-              <text x="1088" y="364" fontSize="12.5" fill="#4c5a63" fontFamily="'PingFang SC', 'Microsoft YaHei', sans-serif">
-                虚构比例
-              </text>
-            </g>
-          </svg>
-
-          {CITY_REGIONS.map((region) => (
-            <span
-              className="v2-map-region"
-              key={region.id}
-              style={{ left: `${region.x}%`, top: `${region.y}%`, '--region': region.color } as CSSProperties}
-            >
-              <b>{region.name}</b>
-              <em>未开放 · {region.note}</em>
-            </span>
-          ))}
-          <span
-            className="v2-map-region"
-            data-active="true"
-            style={{ left: '50%', top: '12%', '--region': '#1b4e75' } as CSSProperties}
-          >
-            <b>江风渡口</b>
-            <em>当前区域 · 潮位与雾航</em>
-          </span>
-
-          {STOPS.map((stop, index) => {
-            const state = stopState(index, current, done);
-            const node = RIVER_REGION.nodes[index];
-            return (
-              <span
-                className="v2-map-stop"
-                key={node.id}
-                data-state={state}
-                data-label={stop.labelSide}
-                style={toPercent(stop.x, stop.y)}
-                title={`${index + 1} ${node.title} · ${STOP_TYPE_LABEL[node.type]}`}
-              >
-                <span className="v2-map-stop-dot">{index + 1}</span>
-                {index === current && !done ? (
-                  <span className="v2-map-callout">
-                    <b>{node.title}</b>
-                    <em>当前节点 · {STOP_TYPE_LABEL[node.type]}</em>
-                  </span>
-                ) : null}
-              </span>
-            );
-          })}
-        </div>
-
-        <div className="v2-map-caption">
-          <span>虚构江城观测图 · 河湾、桥与五区均为游戏设定，不代表真实地理</span>
-          <span>渡口路线 {progress.current} / {progress.total} · 潮位为装饰意象</span>
+        <div className="v2-map-legend" aria-hidden="true">
+          <span data-kind="route">观测路线</span>
+          <span data-kind="river">江流</span>
+          <span data-kind="locked">未解锁区域</span>
         </div>
       </div>
 
-      <div className="v2-map-mobile">
-        <div className="v2-mobile-river" aria-hidden="true" />
-        <ol className="v2-mobile-route">
-          {RIVER_REGION.nodes.map((node, index) => {
-            const state = stopState(index, current, done);
-            return (
-              <li className="v2-mobile-stop" data-state={state} key={node.id}>
-                <span className="v2-map-stop-dot">{index + 1}</span>
-                <div>
-                  <b>{node.title}</b>
-                  <span>{STOP_TYPE_LABEL[node.type]}</span>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-        <p className="fineprint">虚构江城 · 江风渡口路线；桌面端可看到完整城市观测图。</p>
-      </div>
+      <div className="v2-world-map">
+        <svg viewBox="0 0 1200 720" preserveAspectRatio="xMidYMid meet" aria-hidden="true" className="v2-world-svg">
+          <defs>
+            <pattern id="v2-world-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M40 0 L0 0 0 40" fill="none" stroke="#14212b" strokeOpacity="0.06" strokeWidth="1" />
+            </pattern>
+            <pattern id="v2-world-water" width="18" height="14" patternUnits="userSpaceOnUse">
+              <path d="M0 9 q 4.5 -4 9 0 t 9 0" fill="none" stroke="#1b4e75" strokeOpacity="0.22" strokeWidth="1.2" />
+            </pattern>
+          </defs>
+          <rect width="1200" height="720" fill="#e9e5d8" />
+          <rect width="1200" height="720" fill="url(#v2-world-grid)" />
 
-      <ol className="v2-route-key" aria-label="江风渡口五站">
-        {RIVER_REGION.nodes.map((node, index) => {
-          const state = stopState(index, current, done);
+          {/* 江：贯穿全图的主江 + 南侧支流 */}
+          <path
+            d="M-20 330 C 180 286 330 400 560 354 C 780 312 940 250 1220 300 L1220 454 C 980 410 820 500 590 470 C 350 438 170 400 -20 436 Z"
+            fill="#cfe1e8"
+          />
+          <path d="M-20 330 C 180 286 330 400 560 354 C 780 312 940 250 1220 300" fill="none" stroke="#1b4e75" strokeOpacity="0.55" strokeWidth="2.5" />
+          <path d="M-20 436 C 170 400 350 438 590 470 C 820 500 980 410 1220 454" fill="none" stroke="#1b4e75" strokeOpacity="0.55" strokeWidth="2.5" />
+          <path
+            d="M-20 330 C 180 286 330 400 560 354 C 780 312 940 250 1220 300 L1220 454 C 980 410 820 500 590 470 C 350 438 170 400 -20 436 Z"
+            fill="url(#v2-world-water)"
+          />
+          <path d="M330 700 C 320 620 300 540 330 470" fill="none" stroke="#cfe1e8" strokeWidth="56" />
+          <path d="M330 700 C 320 620 300 540 330 470" fill="none" stroke="#1b4e75" strokeOpacity="0.4" strokeWidth="2" strokeDasharray="8 8" />
+
+          {/* 观测路线 */}
+          <g fill="none" stroke="#e2402b" strokeWidth="3" strokeDasharray="12 9" opacity="0.8">
+            <path d="M185 260 C 260 300 300 340 380 350" />
+            <path d="M520 390 C 700 392 820 300 940 250" />
+            <path d="M1040 250 C 1080 340 1040 460 990 520" />
+            <path d="M870 590 C 700 620 480 600 340 570" />
+            <path d="M300 480 C 260 440 220 380 200 300" />
+          </g>
+
+          {/* 陆地等高线 */}
+          <g fill="none" stroke="#14212b" strokeOpacity="0.1" strokeWidth="1.2">
+            <path d="M60 80 q 90 -18 160 8 t 150 4" />
+            <path d="M60 104 q 80 -14 140 10" />
+            <path d="M820 80 q 100 -20 180 0 t 140 10" />
+            <path d="M900 110 q 90 -12 170 6" />
+            <path d="M70 640 q 90 -18 160 4 t 120 0" />
+          </g>
+
+          {/* ================= 过早巷 ================= */}
+          <g className="v2-vignette" data-region="zao">
+            <ellipse cx="185" cy="170" rx="150" ry="105" fill="#c58b25" fillOpacity="0.13" />
+            <ellipse cx="185" cy="170" rx="150" ry="105" fill="none" stroke="#c58b25" strokeOpacity="0.5" strokeDasharray="8 7" />
+            <g stroke="#14212b" strokeWidth="2" fill="none" opacity="0.72">
+              {/* 三个早点摊 */}
+              <path d="M100 190 h54 v-24 h-54 z M100 166 l27 -18 l27 18" />
+              <path d="M164 190 h50 v-20 h-50 z M164 170 l25 -16 l25 16" />
+              <path d="M224 190 h46 v-22 h-46 z M224 168 l23 -14 l23 14" />
+              {/* 桌子与碗 */}
+              <path d="M108 190 v16 M146 190 v16 M108 206 h38" />
+              <path d="M172 190 v14 M206 190 v14 M172 204 h34" />
+              <path d="M116 164 q 5 -9 0 -18 M132 164 q 5 -9 0 -18 M180 164 q 5 -8 0 -16" strokeOpacity="0.55" />
+              <path d="M232 176 q 5 -8 0 -16" strokeOpacity="0.55" />
+            </g>
+            <g stroke="#c58b25" strokeWidth="2.4" fill="none" opacity="0.85">
+              <path d="M126 196 q 20 -8 40 0" />
+              <path d="M190 194 q 18 -7 36 0" />
+            </g>
+          </g>
+
+          {/* ================= 桥影工坊 ================= */}
+          <g className="v2-vignette" data-region="bridge">
+            <ellipse cx="255" cy="560" rx="145" ry="98" fill="#6b5b4e" fillOpacity="0.12" />
+            <ellipse cx="255" cy="560" rx="145" ry="98" fill="none" stroke="#6b5b4e" strokeOpacity="0.5" strokeDasharray="8 7" />
+            <g stroke="#14212b" strokeWidth="2.4" fill="none" opacity="0.78">
+              {/* 支流上的拱桥 */}
+              <path d="M170 548 h168" />
+              <path d="M184 548 Q 254 500 324 548" />
+              <path d="M170 548 v 62 M 338 548 v 62" />
+              <path d="M186 536 v 12 M 218 512 v 36 M 254 500 v 48 M 290 512 v 36 M 322 536 v 12" strokeWidth="1.2" opacity="0.7" />
+              {/* 工坊吊臂 */}
+              <path d="M360 520 v-48 l-52 16" />
+              <path d="M352 480 l 16 0 l 0 22" />
+              <path d="M340 508 l 12 12 l 12 -12" />
+              {/* 齿轮与木板 */}
+              <circle cx="216" cy="610" r="16" />
+              <circle cx="216" cy="610" r="6" />
+              <path d="M216 590 v 40 M 196 610 h 40" strokeWidth="1" opacity="0.6" />
+              <path d="M252 614 h 56 v 8 h-56 z M252 628 h 42 v 8 h-42" />
+            </g>
+            <g stroke="#6b5b4e" strokeWidth="2" fill="none" opacity="0.7">
+              <path d="M300 590 q 24 -12 48 0" />
+            </g>
+          </g>
+
+          {/* ================= 江风渡口 ================= */}
+          <g className="v2-vignette" data-region="river">
+            <ellipse cx="600" cy="392" rx="190" ry="115" fill="#1b4e75" fillOpacity="0.12" />
+            <ellipse cx="600" cy="392" rx="190" ry="115" fill="none" stroke="#1b4e75" strokeOpacity="0.55" strokeDasharray="8 7" />
+            <g stroke="#14212b" strokeWidth="2.2" fill="none" opacity="0.8">
+              {/* 信号塔 */}
+              <path d="M548 388 l 2 -104 M 584 388 l -2 -104" />
+              <path d="M548 326 h 36 M 552 356 h 28 M 542 388 h 48" />
+              <path d="M558 284 h 16 v 14 h-16 z" />
+              <path d="M556 284 q 10 -10 20 0" />
+              <path d="M530 284 q 14 -12 28 0 M 520 270 q 24 -18 48 0" strokeOpacity="0.45" />
+              {/* 浮标 */}
+              <path d="M650 430 l 10 -14 l 10 14 z" />
+              <path d="M660 430 v 12" />
+              {/* 码头栈桥 */}
+              <path d="M610 446 h 94 v 8 h-94 z" />
+              <path d="M626 454 v 16 M 654 454 v 16 M 682 454 v 16" />
+              {/* 渡船 */}
+              <g transform="translate(754 402)">
+                <path d="M-34 0 h68 l-11 19 h-46 z" />
+                <path d="M-4 0 v-24 l24 24" />
+                <path d="M-40 26 q 16 -10 32 0 t 32 0" strokeOpacity="0.5" />
+              </g>
+            </g>
+            <g stroke="#e2402b" strokeWidth="2" fill="none" opacity="0.8">
+              <path d="M574 370 h 8 M 570 352 h 12" />
+              <path d="M586 370 h 8" />
+            </g>
+          </g>
+
+          {/* ================= 樱语山坡 ================= */}
+          <g className="v2-vignette" data-region="sakura">
+            <ellipse cx="985" cy="165" rx="155" ry="110" fill="#c06b82" fillOpacity="0.12" />
+            <ellipse cx="985" cy="165" rx="155" ry="110" fill="none" stroke="#c06b82" strokeOpacity="0.5" strokeDasharray="8 7" />
+            <g stroke="#14212b" strokeWidth="2.2" fill="none" opacity="0.75">
+              {/* 山脊 */}
+              <path d="M850 196 q 70 -72 150 -58 t 120 -8" strokeOpacity="0.35" />
+              <path d="M870 214 q 70 -60 140 -48 t 110 -10" strokeOpacity="0.25" />
+              {/* 樱花树 */}
+              <path d="M966 198 v-44 M 966 166 l -26 -24 M 966 176 l 30 -30 M 966 154 l -12 -18" strokeWidth="3" />
+              <g fill="#c06b82" fillOpacity="0.28" stroke="none">
+                <circle cx="932" cy="130" r="18" />
+                <circle cx="964" cy="112" r="22" />
+                <circle cx="1000" cy="130" r="17" />
+                <circle cx="982" cy="144" r="16" />
+                <circle cx="946" cy="150" r="13" />
+              </g>
+              {/* 档案柜 */}
+              <path d="M1040 200 h40 v-34 h-40 z M1040 182 h40 M1040 166 h40" />
+              <path d="M1050 200 v 12 M 1070 200 v 12" />
+              {/* 落樱 */}
+              <g fill="#c06b82" stroke="none" fillOpacity="0.55">
+                <circle cx="900" cy="150" r="2.2" />
+                <circle cx="1014" cy="166" r="2" />
+                <circle cx="1038" cy="140" r="2.4" />
+              </g>
+            </g>
+          </g>
+
+          {/* ================= 雷鸣创想站 ================= */}
+          <g className="v2-vignette" data-region="thunder">
+            <ellipse cx="965" cy="565" rx="150" ry="105" fill="#2b7570" fillOpacity="0.12" />
+            <ellipse cx="965" cy="565" rx="150" ry="105" fill="none" stroke="#2b7570" strokeOpacity="0.5" strokeDasharray="8 7" />
+            <g stroke="#14212b" strokeWidth="2.2" fill="none" opacity="0.78">
+              {/* 厂房 */}
+              <path d="M880 590 h88 v-58 h-88 z" />
+              <path d="M892 566 h16 v16 h-16 z M920 566 h16 v16 h-16 z M948 566 h8 v16 h-8 z" />
+              <path d="M880 548 l 14 -16 l 14 16 M 908 548 l 14 -16 l 14 16 M 936 548 l 14 -16 l 14 16" strokeOpacity="0.6" />
+              {/* 线圈塔 */}
+              <path d="M1010 600 l 24 -104 M 1058 600 l -24 -104" />
+              <path d="M1018 570 h 32 M 1022 544 h 24 M 1026 518 h 16" />
+              <path d="M1028 496 h 12 v 16 h-12 z" />
+              <g stroke="#2b7570" strokeWidth="2" strokeOpacity="0.8">
+                <path d="M1010 610 q 26 -12 52 0" />
+                <path d="M1004 624 q 32 -14 64 0" />
+              </g>
+              {/* 闪电 */}
+              <path d="M1078 500 l -14 24 h 14 l -10 24" stroke="#e2402b" strokeWidth="3" strokeLinejoin="round" />
+              {/* 电线 */}
+              <path d="M836 520 q 72 -20 144 0" strokeOpacity="0.4" strokeDasharray="5 6" />
+            </g>
+          </g>
+
+          {/* 点缀：树、云、鸟 */}
+          <g fill="none" stroke="#14212b" strokeWidth="1.5" opacity="0.3">
+            <path d="M420 140 l 8 -16 l 8 16 z M420 140 h16 M 428 140 v 8" />
+            <path d="M470 190 l 7 -14 l 7 14 z M470 190 h14 M 477 190 v 7" />
+            <path d="M790 640 l 8 -16 l 8 16 z M790 640 h16 M 798 640 v 8" />
+            <path d="M640 120 q 14 -8 28 0 M 654 112 q 10 -6 20 0" />
+            <path d="M860 90 q 14 -8 28 0 M 874 82 q 10 -6 20 0" />
+            <path d="M180 640 q 16 6 32 0 M 200 648 q 10 4 20 0" />
+          </g>
+
+          {/* 生活细节：路、树、人、烟、船，填满留给想象的空白 */}
+          <g fill="none" stroke="#14212b" strokeWidth="1.5" opacity="0.3">
+            <path d="M60 240 C 130 260 200 250 265 220 M 180 420 C 250 380 360 360 470 350" strokeDasharray="5 7" />
+            <path d="M720 470 C 820 500 900 520 990 500" strokeDasharray="5 7" />
+            <path d="M1060 220 C 1000 260 960 300 940 340" strokeDasharray="5 7" />
+            {/* 路边的小房子 */}
+            <path d="M72 252 h26 v20 h-26 z M72 252 l13 -10 l13 10" />
+            <path d="M114 272 h18 v14 h-18 z M114 272 l9 -7 l9 7" />
+            <path d="M1080 420 h30 v22 h-30 z M1080 420 l15 -11 l15 11" />
+            <path d="M1104 442 v 10 M 1088 452 h28" />
+            {/* 树 */}
+            <path d="M500 120 l9 -18 l9 18 z M500 120 h18 M 509 120 v 8" />
+            <path d="M548 148 l7 -14 l7 14 z M548 148 h14 M 555 148 v 6" />
+            <path d="M700 620 l9 -18 l9 18 z M700 620 h18 M 709 620 v 8" />
+            <path d="M744 646 l7 -14 l7 14 z M744 646 h14" />
+            <path d="M420 560 l8 -16 l8 16 z M420 560 h16 M 428 560 v 7" />
+            <path d="M840 120 l7 -14 l7 14 z M840 120 h14" />
+          </g>
+          <g opacity="0.32">
+            {/* 过早巷排队的人 */}
+            <g fill="none" stroke="#14212b" strokeWidth="1.6">
+              <circle cx="132" cy="250" r="4" />
+              <path d="M132 254 v 16 M 124 260 l 16 0 M 132 270 l -5 9 M 132 270 l 5 9" />
+              <circle cx="150" cy="256" r="4" />
+              <path d="M150 260 v 14 M 142 266 l 16 0 M 150 274 l -4 8 M 150 274 l 4 8" />
+              <circle cx="168" cy="252" r="4" />
+              <path d="M168 256 v 14 M 160 262 l 16 0 M 168 270 l -5 8 M 168 270 l 5 8" />
+            </g>
+            {/* 渡口等船的人 */}
+            <g fill="none" stroke="#14212b" strokeWidth="1.6">
+              <circle cx="670" cy="458" r="4" />
+              <path d="M670 462 v 16 M 662 468 l 16 0 M 670 478 l -5 9 M 670 478 l 5 9" />
+            </g>
+            {/* 创想站的烟与电 */}
+            <g fill="none" stroke="#14212b" strokeWidth="1.5" strokeOpacity="0.45">
+              <path d="M902 532 q 8 -18 22 -16 q 14 2 12 18" />
+              <path d="M930 504 q 12 -20 28 -14" />
+              <path d="M846 470 h -40 M 806 470 l 10 -10 M 806 470 l 10 10" />
+            </g>
+          </g>
+
+          {/* 罗盘与比例尺 */}
+          <g opacity="0.7">
+            <circle cx="1110" cy="620" r="24" fill="none" stroke="#14212b" strokeWidth="1.6" />
+            <path d="M1110 596 l 7 22 l -7 -5 l -7 5 z" fill="#14212b" />
+            <text x="1110" y="662" textAnchor="middle" fontSize="12.5" fill="#14212b" fontFamily="'PingFang SC', 'Microsoft YaHei', sans-serif">
+              N
+            </text>
+            <path d="M80 690 h64 M80 686 v 8 M112 686 v 8 M144 686 v 8" stroke="#14212b" strokeWidth="1.5" />
+            <text x="154" y="694" fontSize="12.5" fill="#4c5a63" fontFamily="'PingFang SC', 'Microsoft YaHei', sans-serif">
+              虚构比例
+            </text>
+          </g>
+        </svg>
+
+        {/* HTML 区域标签：可点击、带状态 */}
+        {REGION_ORDER.map((id) => {
+          const region = REGIONS[id];
+          const pos = POS[id];
+          const status = regionStatus(save, id);
           return (
-            <li className="v2-route-key-item" data-state={state} key={node.id}>
-              <span className="v2-route-key-num">{index + 1}</span>
-              <div>
-                <b>{node.title}</b>
-                <span>{STOP_TYPE_LABEL[node.type]}</span>
-              </div>
-            </li>
+            <button
+              type="button"
+              className="v2-world-label"
+              key={id}
+              data-state={status.state}
+              data-selected={id === selectedRegionId}
+              style={{ left: `${(pos.labelX / 1200) * 100}%`, top: `${(pos.labelY / 720) * 100}%`, '--region': region.accent } as CSSProperties}
+              onClick={() => onSelect(id)}
+              aria-pressed={id === selectedRegionId}
+            >
+              <span className="v2-world-label-name">
+                <i />
+                {region.name}
+              </span>
+              <span className="v2-world-label-meta">{status.label}</span>
+              <span className="v2-world-label-boss">Boss · {getEnemy(region.bossId)?.name ?? '未知'}</span>
+            </button>
           );
         })}
-      </ol>
+      </div>
+
+      <div className="v2-world-mobile">
+        {REGION_ORDER.map((id) => {
+          const region = REGIONS[id];
+          const status = regionStatus(save, id);
+          return (
+            <button
+              type="button"
+              className="v2-world-mobile-item"
+              key={id}
+              data-state={status.state}
+              data-selected={id === selectedRegionId}
+              style={{ '--region': region.accent } as CSSProperties}
+              onClick={() => onSelect(id)}
+            >
+              <span className="v2-world-mobile-mark">{region.name.slice(0, 1)}</span>
+              <span>
+                <b>{region.name}</b>
+                <em>{status.label} · Boss {getEnemy(region.bossId)?.name}</em>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="v2-map-caption">
+        <span>虚构江城观测图 · 五区、桥梁、渡口与地名均为游戏设定，不代表真实地理</span>
+        <span>点击区域查看路线；完成前一区后解锁下一区</span>
+      </div>
     </div>
   );
 }
-

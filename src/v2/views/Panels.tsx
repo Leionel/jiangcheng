@@ -1,9 +1,15 @@
+import { useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import type { ExpeditionBattleState, RegionRunState, SaveV2, V2Creature } from '../domain/types';
+import type { BuildPath, ExpeditionBattleState, RegionId, RegionRunState, SaveV2, V2Creature } from '../domain/types';
 import type { EnemyDef, RegionNodeDef } from '../domain/types';
 import { PATH_META, TAG_LABELS, tagDimension } from '../domain/tags';
 import { ACTIVE_BY_ID, PASSIVE_BY_ID } from '../content/modules';
-import { RIVER_REGION, currentNode, getEnemy, getEvent, nodeProgress, regionComplete } from '../domain/region';
+import { getEnemy, getEvent, getRegion, currentNode, nodeProgress } from '../domain/region';
+import { bondLabel } from '../domain/bonds';
+import { QUEST_DEFS, completedQuestCount, questProgress, questState } from '../domain/quests';
+import { canEvolve } from '../domain/evolution';
+import { evolutionBranchName } from '../content/evolutions';
+import { xpPercent, xpToNext } from '../domain/growth';
 import { battleSummary } from '../domain/battle2';
 import { v2AiLog } from '../ai/gateway';
 import { ELEMENTS } from '../../features/monsters/elements';
@@ -32,10 +38,12 @@ export function CreatureMiniCard({
   creature,
   active,
   action,
+  tier,
 }: {
   creature: V2Creature;
   active?: boolean;
   action?: ReactNode;
+  tier?: string;
 }) {
   const passive = PASSIVE_BY_ID.get(creature.passiveId);
   return (
@@ -54,6 +62,17 @@ export function CreatureMiniCard({
           <div className="v2-specimen-badges">
             <ElementBadge element={creature.element} />
             <PathBadge path={creature.buildPath} />
+            {creature.evolutionId ? (
+              <span className="v2-badge" data-kind="ai">进化 · {evolutionBranchName(creature.evolutionId)}</span>
+            ) : null}
+            {tier ? <span className="v2-badge" data-kind="tier">{tier}</span> : null}
+          </div>
+          <div className="v2-growth-line">
+            <b>Lv.{creature.level}</b>
+            <span className="v2-xp-bar">
+              <i style={{ width: `${xpPercent(creature)}%` }} />
+            </span>
+            <em>{creature.level >= 5 ? 'MAX' : `${creature.xp} / ${xpToNext(creature.level)} XP`}</em>
           </div>
           <p className="v2-specimen-flavor">{creature.flavor}</p>
           <div className="v2-specimen-stats">
@@ -91,6 +110,7 @@ export function PartyWorkshop({
   onStartRun,
   onOpenCapture,
   onOpenCodex,
+  onOpenEvolution,
 }: {
   save: SaveV2;
   onToggleParty: (id: string) => void;
@@ -99,6 +119,7 @@ export function PartyWorkshop({
   onStartRun: () => void;
   onOpenCapture: () => void;
   onOpenCodex: () => void;
+  onOpenEvolution: (id: string) => void;
 }) {
   const party = save.party.ids
     .map((id) => save.collection.find((item) => item.id === id))
@@ -112,12 +133,16 @@ export function PartyWorkshop({
           <p className="v2-rubric">我的队伍 · 三人编成</p>
           <h2 className="v2-h2">主战一个，支援两个</h2>
           <p className="v2-lede">每回合一次主战行动加一次支援指令；换位消耗共鸣。支援位负责治疗、侦测、接力与连携。</p>
+          <div className="v2-party-meta">
+            <span className="v2-badge" data-kind="resource">羁绊 · {bondLabel(save.bondPoints)}</span>
+            <span className="fineprint">一起战斗积累羁绊，解锁第 3–6 条连携</span>
+          </div>
         </div>
         <div className="v2-panel-actions">
           <button type="button" className="v2-btn v2-btn-sm" onClick={onOpenCapture}>捕获站</button>
           <button type="button" className="v2-btn v2-btn-sm" onClick={onOpenCodex}>图鉴</button>
           <button type="button" className="v2-btn v2-btn-primary v2-btn-lg" onClick={onStartRun} disabled={party.length < 3}>
-            出发 · 江风渡口
+            打开江城地图
           </button>
         </div>
       </div>
@@ -140,6 +165,14 @@ export function PartyWorkshop({
                   <div className="v2-specimen-badges">
                     <ElementBadge element={creature.element} />
                     <PathBadge path={creature.buildPath} />
+                    {creature.evolutionId ? (
+                      <span className="v2-badge" data-kind="ai">{evolutionBranchName(creature.evolutionId)}</span>
+                    ) : null}
+                  </div>
+                  <div className="v2-growth-line">
+                    <b>Lv.{creature.level}</b>
+                    <span className="v2-xp-bar"><i style={{ width: `${xpPercent(creature)}%` }} /></span>
+                    <em>{creature.level >= 5 ? 'MAX' : `${creature.xp}/${xpToNext(creature.level)}`}</em>
                   </div>
                   <div className="v2-slot-stats">
                     <span>HP {creature.stats.hp}</span>
@@ -149,6 +182,9 @@ export function PartyWorkshop({
                   <div className="v2-slot-actions">
                     <button type="button" className="v2-btn v2-btn-ghost v2-btn-sm" onClick={() => onSetActive(creature.id)} disabled={creature.id === activeId}>
                       设为主战
+                    </button>
+                    <button type="button" className="v2-btn v2-btn-ghost v2-btn-sm" onClick={() => onOpenEvolution(creature.id)}>
+                      {creature.evolutionId ? '成长记录' : canEvolve(creature) ? '可以进化' : '成长'}
                     </button>
                     <button type="button" className="v2-btn v2-btn-ghost v2-btn-sm" onClick={() => onToggleParty(creature.id)}>
                       移出
@@ -195,9 +231,14 @@ export function PartyWorkshop({
             creature={creature}
             active={inParty.has(creature.id)}
             action={
-              <button type="button" className={inParty.has(creature.id) ? 'v2-btn v2-btn-sm' : 'v2-btn v2-btn-primary v2-btn-sm'} onClick={() => onToggleParty(creature.id)}>
-                {inParty.has(creature.id) ? '移出队伍' : '上阵'}
-              </button>
+              <>
+                <button type="button" className={inParty.has(creature.id) ? 'v2-btn v2-btn-sm' : 'v2-btn v2-btn-primary v2-btn-sm'} onClick={() => onToggleParty(creature.id)}>
+                  {inParty.has(creature.id) ? '移出队伍' : '上阵'}
+                </button>
+                <button type="button" className="v2-btn v2-btn-sm" onClick={() => onOpenEvolution(creature.id)}>
+                  成长
+                </button>
+              </>
             }
           />
         ))}
@@ -206,67 +247,128 @@ export function PartyWorkshop({
   );
 }
 
+
 export function RegionMap({
-  run,
+  save,
+  selectedRegionId,
+  onSelectRegion,
   onChooseEvent,
   onEnterBattle,
+  onStartRegion,
   onRestartRun,
   onOpenParty,
   onOpenCodex,
   onOpenCapture,
 }: {
-  run: RegionRunState;
+  save: SaveV2;
+  selectedRegionId: RegionId;
+  onSelectRegion: (id: RegionId) => void;
   onChooseEvent: (eventId: string, choiceId: string) => void;
   onEnterBattle: (node: RegionNodeDef, enemy: EnemyDef) => void;
-  onRestartRun: () => void;
+  onStartRegion: (id: RegionId) => void;
+  onRestartRun: (id: RegionId) => void;
   onOpenParty: () => void;
   onOpenCodex: () => void;
   onOpenCapture: () => void;
 }) {
-  const node = currentNode(run);
-  const event = getEvent(node.eventId);
-  const enemy = getEnemy(node.enemyId);
-  const progress = nodeProgress(run);
-  const completed = regionComplete(run);
+  const region = getRegion(selectedRegionId);
+  const run = save.regionRuns[selectedRegionId] ?? null;
+  const unlocked = save.unlockedRegions.includes(selectedRegionId);
+  const completed = Boolean(run?.completed);
+  const node = run && !completed ? currentNode(run) : null;
+  const event = getEvent(node?.eventId);
+  const enemy = getEnemy(node?.enemyId);
+  const boss = getEnemy(region.bossId);
+  const progress = run ? nodeProgress(run) : { current: 0, total: region.nodes.length };
+  const unlockRegion = region.unlockAfter ? getRegion(region.unlockAfter) : null;
+  const regionState = completed ? 'done' : run ? 'active' : unlocked ? 'ready' : 'locked';
+
   return (
     <section className="v2-panel">
       <div className="v2-panel-head">
         <div>
-          <p className="v2-rubric">江城地图 · {RIVER_REGION.name}</p>
-          <h2 className="v2-h2">雾、潮位与不肯停的暴雨</h2>
-          <p className="v2-lede">一次探索五个节点：事件、战斗、事件、精英、Boss。开局共鸣与材料会一直带到后面的战斗。</p>
+          <p className="v2-rubric">江城地图 · 五区观测</p>
+          <h2 className="v2-h2">一条江，五个不想睡的地方</h2>
+          <p className="v2-lede">完成一个区域会解锁下一区。点地图上的区域查看路线；已解锁的区域随时可以重新探索。</p>
         </div>
         <div className="v2-panel-actions">
-          <span className="v2-badge" data-kind="resource">材料 {run.materials}</span>
-          <span className="v2-badge" data-kind="resource">信物 {run.tokens}</span>
-          <span className="v2-badge" data-kind="resource">开局共鸣 {run.startResonance}</span>
+          <span className="v2-badge" data-kind="resource">材料 {save.materials}</span>
+          <span className="v2-badge" data-kind="resource">信物 {save.tokens}</span>
+          <span className="v2-badge" data-kind="resource">羁绊 {bondLabel(save.bondPoints)}</span>
           <button type="button" className="v2-btn v2-btn-sm" onClick={onOpenParty}>队伍</button>
           <button type="button" className="v2-btn v2-btn-sm" onClick={onOpenCapture}>捕获</button>
           <button type="button" className="v2-btn v2-btn-sm" onClick={onOpenCodex}>图鉴</button>
         </div>
       </div>
 
-      <JiangchengMap run={run} />
+      <JiangchengMap save={save} selectedRegionId={selectedRegionId} onSelect={onSelectRegion} />
 
-      <div className="v2-node-panel">
-        {completed ? (
-          <div className="v2-complete">
-            <span className="v2-complete-stamp">区域完成</span>
-            <h3 className="v2-h3">风雨电台停止播报，渡口恢复了潮声。</h3>
-            <p className="v2-lede">获得信物 {run.tokens}、材料 {run.materials}。可以重新探索，或回队伍调整后再来。</p>
-            <div className="v2-node-actions">
-              <button type="button" className="v2-btn v2-btn-primary" onClick={onRestartRun}>重新探索江风渡口</button>
-              <button type="button" className="v2-btn" onClick={onOpenParty}>调整队伍</button>
-              <button type="button" className="v2-btn" onClick={onOpenCodex}>打开图鉴</button>
+      <div className="v2-region-layout">
+        <div className="v2-region-main">
+          <div className="v2-region-title" style={{ '--region': region.accent } as CSSProperties}>
+            <div>
+              <p className="v2-rubric">当前查看 · {regionState === 'done' ? '已完成' : regionState === 'active' ? '进行中' : unlocked ? '可探索' : '未解锁'}</p>
+              <h3 className="v2-h3">{region.name}</h3>
+              <p className="v2-lede">{region.blurb}</p>
             </div>
+            <span className="v2-region-stamp" data-state={regionState}>{region.landmark}</span>
           </div>
-        ) : (
-          <div className="v2-node-layout">
-            <div className="v2-node-main">
-              <p className="v2-rubric">当前节点 {progress.current} / {progress.total} · {node.type === 'event' ? '事件' : '战斗'}</p>
-              <h3 className="v2-h3">{node.title}</h3>
-              <p className="v2-lede">{node.desc}</p>
-              {node.type === 'event' && event ? (
+
+          <ol className="v2-route-key" aria-label={`${region.name}五站`}>
+            {region.nodes.map((item, index) => {
+              const state = completed || index < (run?.nodeIndex ?? 0) ? 'done' : index === (run?.nodeIndex ?? -1) ? 'current' : 'locked';
+              return (
+                <li className="v2-route-key-item" data-state={state} key={item.id}>
+                  <span className="v2-route-key-num">{index + 1}</span>
+                  <div>
+                    <b>{item.title}</b>
+                    <span>{item.type === 'event' ? '事件' : item.type === 'boss' ? 'Boss' : item.type === 'elite' ? '精英' : '战斗'}</span>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+
+          <div className="v2-node-panel">
+            {!unlocked ? (
+              <div className="v2-region-locked">
+                <b>尚未解锁</b>
+                <p className="v2-lede">
+                  {unlockRegion ? `先完成「${unlockRegion.name}」，这里才会在图上亮起来。` : '继续推进前面的区域。'}
+                </p>
+              </div>
+            ) : completed ? (
+              <div className="v2-complete">
+                <span className="v2-complete-stamp">区域完成</span>
+                <h3 className="v2-h3">{region.name}的 Boss 已经退场。</h3>
+                <p className="v2-lede">
+                  在箱子里留下材料 {run?.materials ?? 0}、信物 {run?.tokens ?? 0}。可以重新探索，或去下一区看看。
+                </p>
+                <div className="v2-node-actions">
+                  <button type="button" className="v2-btn v2-btn-primary" onClick={() => onRestartRun(selectedRegionId)}>重新探索{region.name}</button>
+                  <button type="button" className="v2-btn" onClick={onOpenParty}>调整队伍</button>
+                  <button type="button" className="v2-btn" onClick={onOpenCodex}>打开图鉴</button>
+                </div>
+              </div>
+            ) : !run || !node ? (
+              <div className="v2-region-start">
+                <p className="v2-rubric">路线准备</p>
+                <h3 className="v2-h3">{region.nodes.length} 个节点 · 终点 {boss?.name}</h3>
+                <p className="v2-lede">
+                  带 3 只造物进入。事件会改变开局共鸣/材料/羁绊；Boss 必须击破，拖到回合上限算失败。
+                </p>
+                <div className="v2-node-actions">
+                  <button type="button" className="v2-btn v2-btn-primary v2-btn-lg" onClick={() => onStartRegion(selectedRegionId)}>
+                    开始探索 · {region.name}
+                  </button>
+                  <button type="button" className="v2-btn" onClick={onOpenParty}>调整队伍</button>
+                </div>
+              </div>
+            ) : node.type === 'event' && event ? (
+              <div>
+                <p className="v2-rubric">当前节点 {progress.current} / {progress.total} · 事件</p>
+                <h3 className="v2-h3">{node.title}</h3>
+                <p className="v2-lede">{event.text}</p>
                 <div className="v2-event-choices">
                   {event.choices.map((choice) => (
                     <button type="button" className="v2-choice" key={choice.id} onClick={() => onChooseEvent(event.id, choice.id)}>
@@ -275,53 +377,120 @@ export function RegionMap({
                     </button>
                   ))}
                 </div>
-              ) : null}
-              {(node.type === 'battle' || node.type === 'elite' || node.type === 'boss') && enemy ? (
+              </div>
+            ) : enemy ? (
+              <div>
+                <p className="v2-rubric">当前节点 {progress.current} / {progress.total} · {node.title}</p>
+                <h3 className="v2-h3">{node.title}</h3>
+                <p className="v2-lede">{node.desc}</p>
                 <button type="button" className="v2-btn v2-btn-primary v2-btn-lg" onClick={() => onEnterBattle(node, enemy)}>
                   {enemy.kind === 'boss' ? '挑战 Boss' : '进入战斗'}
                 </button>
-              ) : null}
-            </div>
-            {enemy && node.type !== 'event' ? (
-              <aside className="v2-enemy-preview">
-                <span className="v2-enemy-preview-art">
-                  <MonsterSprite
-                    recipe={{ shape: enemy.kind === 'boss' ? 'shard' : 'blob', crest: 'wave', accessory: 'none', palette: ['#8FB6C6', ELEMENTS[enemy.element].color, '#E8F2F5'] }}
-                    title={enemy.name}
-                  />
-                </span>
-                <div className="v2-enemy-preview-main">
-                  <div className="v2-specimen-badges">
-                    <ElementBadge element={enemy.element} />
-                    <span className="v2-badge" data-kind={enemy.kind === 'boss' ? 'boss' : 'mode'}>
-                      {enemy.kind === 'boss' ? '双阶段 Boss' : enemy.kind === 'elite' ? '精英' : '普通'}
-                    </span>
-                  </div>
-                  <b>{enemy.name}</b>
-                  <p className="v2-enemy-preview-taunt">{enemy.taunt}</p>
-                  <div className="v2-specimen-stats">
-                    <span><em>HP</em><b>{enemy.maxHp}</b></span>
-                    <span><em>ATK</em><b>{enemy.atk}</b></span>
-                    <span><em>DEF</em><b>{enemy.def}</b></span>
-                  </div>
-                </div>
-              </aside>
-            ) : (
-              <aside className="v2-node-aside">
-                <span className="v2-badge" data-kind="resource">渡口笔记</span>
-                <p>这是选择型节点：不进入战斗，但会改变下一场战斗的开局资源或材料。</p>
-                <p className="fineprint">雾里的灯、松脱的缆绳都只是提醒。真正的代价会在后面的战斗里出现。</p>
-                <span className="v2-aside-glyph" aria-hidden="true">江</span>
-              </aside>
-            )}
+              </div>
+            ) : null}
           </div>
-        )}
-      </div>
 
-      <div className="v2-run-log">
-        {run.log.slice(-4).map((line, index) => (
-          <p className="fineprint" key={`${index}-${line}`}>· {line}</p>
-        ))}
+          <div className="v2-run-log">
+            {(run?.log ?? [`${region.name}还没有出发记录。`]).slice(-4).map((line, index) => (
+              <p className="fineprint" key={`${index}-${line}`}>· {line}</p>
+            ))}
+          </div>
+        </div>
+
+        <aside className="v2-region-side">
+          <div className="v2-enemy-preview">
+            <span className="v2-enemy-preview-art" style={{ background: `color-mix(in srgb, ${region.accent} 8%, var(--paper))` }}>
+              <MonsterSprite
+                recipe={{ shape: boss?.kind === 'boss' ? 'shard' : 'blob', crest: 'wave', accessory: 'none', palette: ['#8FB6C6', region.accent, '#E8F2F5'] }}
+                title={boss?.name ?? '区域 Boss'}
+              />
+            </span>
+            <div className="v2-enemy-preview-main">
+              <div className="v2-specimen-badges">
+                <span className="v2-badge" data-kind="boss">{boss?.kind === 'boss' ? '区域 Boss' : '未知'}</span>
+                <span className="v2-badge" data-kind="element"><i style={{ background: region.accent }} />{region.accent}</span>
+              </div>
+              <b>{boss?.name}</b>
+              <p className="v2-enemy-preview-taunt">{boss?.taunt}</p>
+              <div className="v2-specimen-stats">
+                <span><em>HP</em><b>{boss?.maxHp ?? '—'}</b></span>
+                <span><em>ATK</em><b>{boss?.atk ?? '—'}</b></span>
+                <span><em>DEF</em><b>{boss?.def ?? '—'}</b></span>
+              </div>
+            </div>
+          </div>
+
+          <div className="v2-appendix" style={{ padding: 12 }}>
+            <p className="v2-rubric">区域规则</p>
+            <p className="fineprint">
+              {region.id === 'river'
+                ? '暴雨会淋湿全队；有护盾/防御时伤害减半。Boss 半血进入第二阶段，积水成渊更频繁。'
+                : region.id === 'zao'
+                  ? '每次命中会给大厨叠加「热度」。热度到 3 时进入第二阶段，锅气爆炒会附加脆弱。'
+                  : region.id === 'bridge'
+                    ? '桥影守卫会周期性封锁支援：被封锁的回合支援/连携不可用，留好防御与普攻。'
+                    : region.id === 'sakura'
+                      ? '档案员会抄录你上一招；重复使用同一技能会被反制蓄势，轮换招式可破解。'
+                      : '主脑有三阶段：血量 2/3、1/3 时升级；第三阶段「全域过载」会连续范围攻击。'}
+            </p>
+            {unlockRegion ? <p className="fineprint">前置区域：{unlockRegion.name}</p> : <p className="fineprint">起始区域，默认解锁。</p>}
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+export function QuestPanel({
+  save,
+  onClaim,
+}: {
+  save: SaveV2;
+  onClaim: (questId: string) => void;
+}) {
+  return (
+    <section className="v2-panel">
+      <div className="v2-panel-head">
+        <div>
+          <p className="v2-rubric">任务 / 观测记录</p>
+          <h2 className="v2-h2">先做哪一件？</h2>
+          <p className="v2-lede">故事、成长、收藏、挑战四类任务。进度自动记录，奖励只能领一次。</p>
+        </div>
+        <div className="v2-panel-actions">
+          <span className="v2-badge" data-kind="resource">已完成 {completedQuestCount(save)} / {QUEST_DEFS.length}</span>
+        </div>
+      </div>
+      <div className="v2-quest-grid">
+        {QUEST_DEFS.map((quest) => {
+          const state = questState(quest, save);
+          const value = questProgress(quest, save);
+          return (
+            <div className="v2-quest" data-state={state} key={quest.id}>
+              <div className="v2-quest-head">
+                <span className="v2-badge" data-kind={state === 'claimed' ? 'reserved' : state === 'complete' ? 'ai' : 'mode'}>
+                  {state === 'claimed' ? '已领取' : state === 'complete' ? '可领取' : state === 'locked' ? '未解锁' : '进行中'}
+                </span>
+                <span className="v2-quest-kind">{quest.kind === 'story' ? '故事' : quest.kind === 'growth' ? '成长' : quest.kind === 'collection' ? '收藏' : '挑战'}</span>
+              </div>
+              <b>{quest.title}</b>
+              <p>{quest.desc}</p>
+              <div className="v2-quest-progress">
+                <span style={{ width: `${Math.round((value / Math.max(1, quest.target)) * 100)}%` }} />
+              </div>
+              <div className="v2-quest-foot">
+                <span className="fineprint">
+                  {value} / {quest.target}
+                  {quest.reward.materials ? ` · 材料 ${quest.reward.materials}` : ''}
+                  {quest.reward.tokens ? ` · 信物 ${quest.reward.tokens}` : ''}
+                  {quest.reward.xp ? ` · 经验 ${quest.reward.xp}` : ''}
+                </span>
+                <button type="button" className="v2-btn v2-btn-sm" disabled={state !== 'complete'} onClick={() => onClaim(quest.id)}>
+                  {state === 'claimed' ? '已领取' : '领取'}
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -344,6 +513,7 @@ export function BattleResult({
 }) {
   const summary = battleSummary(battle);
   const win = battle.outcome === 'win';
+  const resultRegion = getRegion(run.regionId);
   return (
     <section className="v2-result">
       <div className="v2-result-head">
@@ -351,7 +521,7 @@ export function BattleResult({
           {win ? '胜' : battle.outcome === 'lose' ? '负' : '平'}
         </span>
         <div>
-          <p className="v2-rubric">探索战结算 · {RIVER_REGION.name}</p>
+          <p className="v2-rubric">探索战结算 · {resultRegion.name}</p>
           <h2 className="v2-h2">{win ? '风暴停了一小会儿' : battle.outcome === 'lose' ? '这次被潮水压过去了' : '打平了，但潮水还没退'}</h2>
           <p className="v2-lede">
             {summary.rounds} 回合 · 敌方 AI 参与 {summary.aiRounds} / {battle.planLog.length} 回合 · 奖励材料 {summary.rewards.materials}
@@ -383,7 +553,7 @@ export function BattleResult({
             ))}
           </div>
           <p className="v2-result-progress">
-            探索进度：节点 {Math.min(run.nodeIndex + 1, RIVER_REGION.nodes.length)} / {RIVER_REGION.nodes.length} · 材料 {run.materials} · 信物 {run.tokens}
+            探索进度：节点 {Math.min(run.nodeIndex + 1, resultRegion.nodes.length)} / {resultRegion.nodes.length} · 材料 {run.materials} · 信物 {run.tokens}
           </p>
         </div>
       </div>
@@ -422,6 +592,7 @@ export function CodexView({
   onOpenCapture,
   onExport,
   onImport,
+  onShare,
 }: {
   save: SaveV2;
   preferLive: boolean;
@@ -432,8 +603,16 @@ export function CodexView({
   onOpenCapture: () => void;
   onExport: () => void;
   onImport: (text: string) => void;
+  onShare: () => void;
 }) {
   const locked = new Set(save.lockedIds);
+  const [filter, setFilter] = useState<'all' | BuildPath>('all');
+  const [onlyEvolved, setOnlyEvolved] = useState(false);
+  const tierOf = (creature: V2Creature) =>
+    creature.evolutionId || creature.level >= 5 ? '掌握' : creature.level >= 3 ? '研究' : '发现';
+  const visible = save.collection.filter(
+    (creature) => (filter === 'all' || creature.buildPath === filter) && (!onlyEvolved || Boolean(creature.evolutionId)),
+  );
   return (
     <section className="v2-panel">
       <div className="v2-panel-head">
@@ -448,6 +627,7 @@ export function CodexView({
           </button>
           <button type="button" className="v2-btn v2-btn-sm" onClick={onOpenParty}>队伍</button>
           <button type="button" className="v2-btn v2-btn-sm" onClick={onOpenCapture}>捕获</button>
+          <button type="button" className="v2-btn v2-btn-sm" onClick={onShare}>复制挑战码</button>
           <button type="button" className="v2-btn v2-btn-sm" onClick={onExport}>导出存档</button>
           <label className="v2-btn v2-btn-sm v2-file-btn">
             导入存档
@@ -466,11 +646,31 @@ export function CodexView({
         </div>
       </div>
 
+      <div className="v2-codex-filters">
+        <span className="v2-rubric">筛选</span>
+        {(['all', 'guardian', 'striker', 'trickster', 'support', 'mover'] as const).map((path) => (
+          <button
+            type="button"
+            className="v2-pill"
+            key={path}
+            data-on={filter === path}
+            onClick={() => setFilter(path)}
+          >
+            {path === 'all' ? '全部' : PATH_META[path].name}
+          </button>
+        ))}
+        <button type="button" className="v2-pill" data-on={onlyEvolved} onClick={() => setOnlyEvolved((value) => !value)}>
+          只看进化
+        </button>
+        <span className="fineprint">显示 {visible.length} / {save.collection.length} 只 · 三层：发现 / 研究 / 掌握</span>
+      </div>
+
       <div className="v2-codex-grid">
-        {save.collection.map((creature) => (
+        {visible.map((creature) => (
           <CreatureMiniCard
             key={creature.id}
             creature={creature}
+            tier={tierOf(creature)}
             action={
               <button
                 type="button"
@@ -483,6 +683,7 @@ export function CodexView({
           />
         ))}
       </div>
+      {visible.length === 0 ? <p className="fineprint">这个筛选下还没有造物。换一个成长倾向看看。</p> : null}
 
       <div className="v2-appendix-grid">
         <details className="v2-appendix">
@@ -515,3 +716,7 @@ export function CodexView({
     </section>
   );
 }
+
+
+
+

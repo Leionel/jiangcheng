@@ -11,9 +11,10 @@
 | 代码量 | 约 9.5k 行（含 CSS 2.5k、测试 900+、服务端 620） |
 | 技术栈 | React 18 + Vite 5 + TypeScript + zod + vitest；服务端零依赖 Node |
 | 模型 | 武大 MaaS `https://maas.whu.edu.cn/v1` · `deepseek-v4-flash`（已实测可读图，延迟 1.2–18.4s；可用于敌方选招） |
-| 状态 | P1 完成；2.0 Batch 0/1 探索切片可玩（`?v2=1`）；**67 条测试全绿（v1 38 + v2 29）**；无 git 远程仓库（已建立本地基线） |
+| 状态 | P1 完成；2.0 Batch 2–5 五区闭环可玩（`?v2=1`）；**85 条测试全绿（v1 38 + v2 47）**；无 git 远程仓库（已建立本地基线） |
 | P1 文档 | `docs/P1-AUDIT.md`（审计）/ `docs/P1-PLAN.md`（任务清单）/ `docs/P1-RESULT.md`（实施结果） |
-| 2.0 文档 | `docs/JIANGCHENG_2_GDD.md` 等六份规划 + `docs/JIANGCHENG_2_STATUS.md`（Batch 0/1 实施状态） |
+| 2.0 文档 | 六份规划 + `docs/JIANGCHENG_2_STATUS.md` / `docs/JIANGCHENG_2_UI_PASS.md` / `docs/JIANGCHENG_2_BATCH2_5_REPORT.md` |
+| 艺术资产 | `docs/art/jiangcheng-map-poster.png`（手绘五区观测图）+ `docs/art/WET_INK_CARTOGRAPHY.md` |
 
 ---
 

@@ -155,7 +155,7 @@ const V2_TAG_IDS = [
   'river', 'rain', 'flower', 'street_food', 'bridge', 'campus', 'invention', 'generic',
 ];
 const V2_BUILD_PATHS = ['guardian', 'striker', 'trickster', 'support', 'mover'];
-const V2_ENEMY_ACTIONS = ['strike', 'guard', 'gather', 'storm', 'deluge'];
+const V2_ENEMY_ACTIONS = ['strike', 'guard', 'gather', 'storm', 'deluge', 'heat_wave', 'lock', 'record', 'overload'];
 
 const EvidenceOutputSchema = z.object({
   tag: z.enum(V2_TAG_IDS),
@@ -458,7 +458,7 @@ const ANALYZE_OBJECT_PROMPT = `你是《江城万物怪 2.0》的“物品语义
 const BATTLE_DIRECTOR_V2_PROMPT = `你是《江城万物怪 2.0》探索战的敌方导演，替 Boss/敌人选择本回合行动。
 你只能从 actions 里选一个 id，不能发明动作、不能改伤害或胜负；伤害与阶段转移由规则引擎执行。
 
-可用动作 id：strike 单体攻击 / guard 获得护盾 / gather 蓄势（下一击更重） / storm 暴雨（范围+潮湿） / deluge 积水成渊（更强的范围）
+可用动作 id：strike 单体攻击 / guard 获得护盾 / gather 蓄势 / storm 暴雨（范围+潮湿） / deluge 积水成渊 / heat_wave 锅气爆炒（范围+脆弱） / lock 桥面封锁（让下回合支援不可用） / record 抄录招式（反制重复技能） / overload 全域过载（三阶段大招）
 考虑：回合、Boss 阶段、队伍血量、共鸣、玩家最近行动；选择必须能形成可读的预告。
 
 只输出 JSON，不要 Markdown，不要解释。格式：
@@ -1075,3 +1075,4 @@ server.listen(PORT, () => {
   console.log(`  模型：${AI_AVAILABLE ? `${MODEL} @ ${BASE_URL}` : '未配置（仅演示模式）'}`);
   console.log(`  静态目录：${DIST}${existsSync(DIST) ? '' : '（尚不存在，请先 npm run build）'}`);
 });
+

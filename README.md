@@ -25,10 +25,13 @@ npm run check:ai     # 真实模型：analyze / battle-plan / analyze-object / b
 
 - **物品语义编译器**：五维标签 + 看见/推断/我确认三源证据 + 3 次纠正，技能与数值全部由规则编译（预算 68–75）。
 - **三人队伍 + expedition_v2**：主战/支援、换位、支援指令、共鸣、状态、连携；纯函数、可复现。
+- **五区闭环**：江风渡口、过早巷、桥影工坊、樱语山坡、雷鸣创想站；每区独立 Boss 机制（暴雨/热度/封锁/记录/三阶段过载）。
+- **成长与长期进度**：等级 1–5、6 组进化 × 2 分支（预览/应用/回退）、羁绊 4 档 + 6 连携、12 个任务。
 - **AI 真实参与**：Boss/敌人每回合在合法行动中由模型选招，伤害/阶段/胜负仍由规则结算；失败自动回落并标注来源。
-- **江风渡口**：5 节点、2 个机制事件、2 个敌人原型、双阶段 Boss；区域进度/材料/信物持久化。
-- **UI 设计 pass**：字号/组件统一、属性与证据彩色标签、标本标签、战斗操作台重排，以及一张可读的**虚构江城渡运观测图**（桌面 SVG / 移动端竖向路线）。详见 [`docs/JIANGCHENG_2_UI_PASS.md`](docs/JIANGCHENG_2_UI_PASS.md)。
-- **兼容**：旧 `jcm.gallery.v1` 只读迁移不丢卡；旧版快斗、37 条 P1 测试与 10 步 E2E 保持通过。
+- **江城全图**：1200×720 手绘观测图，五区可点击、路线/Boss 情报/区域规则；移动端竖向五区路线。另有艺术海报 `docs/art/jiangcheng-map-poster.png`。
+- **图鉴与分享**：三层图鉴、筛选、锁定保护；`JCM2-` 挑战码复制/解码；旧 `jcm.gallery.v1` 只读迁移。
+- **兼容**：旧版快斗、P1 测试与 10 步 E2E 保持通过。
+- 实施状态见 [`docs/JIANGCHENG_2_STATUS.md`](docs/JIANGCHENG_2_STATUS.md)；Batch 2–5 报告见 [`docs/JIANGCHENG_2_BATCH2_5_REPORT.md`](docs/JIANGCHENG_2_BATCH2_5_REPORT.md)。
 - 当前实施状态、偏差与 Batch 2 计划见 [`docs/JIANGCHENG_2_STATUS.md`](docs/JIANGCHENG_2_STATUS.md)。
 
 ---
@@ -56,6 +59,7 @@ npm run check:ai         # 真实模型冒烟：analyze / battle-plan / analyze-
 npm run shots            # 无头 Chrome 走完整流程 + 截图到 docs/shots/
 npm run shots:2          # 2.0 探索切片 E2E + 截图到 docs/shots-2/
 npm run shots:ui         # 2.0 UI 走查（桌面 1440 / 移动 390）
+npm run art:map          # 生成手绘江城海报 docs/art/jiangcheng-map-poster.png
 ```
 
 环境：Node ≥ 18（开发用 22.22 验证），桌面 Chrome 最近版本。移动端 375px 已验证不横向溢出。

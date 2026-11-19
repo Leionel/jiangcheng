@@ -28,10 +28,22 @@ export const V2_RULES = {
   swapCost: 1,
   linkCost: 2,
   damageScale: 0.62,
-  statusCap: { wet: 3, vulnerable: 1, charge: 3, guard: 1, mark: 2, bind: 1, shield: 30 } as Record<
+  statusCap: { wet: 3, vulnerable: 1, charge: 3, guard: 1, mark: 2, bind: 1, heat: 5, shield: 30 } as Record<
     StatusId,
     number
   >,
+};
+
+export const ENEMY_ACTION_LABEL: Record<EnemyActionId, string> = {
+  strike: '单体攻击',
+  guard: '收拢防御',
+  gather: '蓄势',
+  storm: '暴雨',
+  deluge: '积水成渊',
+  heat_wave: '锅气爆炒',
+  lock: '桥面封锁',
+  record: '抄录招式',
+  overload: '全域过载',
 };
 
 const STATUS_NAME: Record<StatusId, string> = {
@@ -42,6 +54,7 @@ const STATUS_NAME: Record<StatusId, string> = {
   guard: '防御',
   mark: '标记',
   bind: '束缚',
+  heat: '热度',
 };
 
 /* ------------------------------- 基础工具 ------------------------------- */
@@ -170,6 +183,7 @@ export function createExpeditionBattle(input: {
   enemy: EnemyDef;
   startResonance?: number;
   maxRounds?: number;
+  bondLevel?: number;
 }): ExpeditionBattleState {
   if (input.team.length !== 3) throw new Error('expedition_v2 需要 3 人队伍');
   const enemy = createEnemyState(input.enemy);
@@ -190,9 +204,12 @@ export function createExpeditionBattle(input: {
     planLog: [],
     outcome: null,
     linkUsed: false,
+    bondLevel: clamp(input.bondLevel ?? 0, 0, 3),
+    supportLockedRound: 0,
     rewards: { materials: 0, tokens: 0 },
     fingerprint: '',
   };
+  if (enemy.def.bossRule === 'record') state.recordedSkill = undefined;
   state.log.push({
     round: 1,
     kind: 'round',
@@ -217,20 +234,41 @@ export function aliveReserveIndexes(state: ExpeditionBattleState): number[] {
 export function legalEnemyActions(state: ExpeditionBattleState): EnemyActionId[] {
   const enemy = state.enemy;
   const actions: EnemyActionId[] = ['strike'];
-  const stormRound = state.round % 2 === 0 || enemy.phase >= 2;
-  if (enemy.def.kind === 'boss' && stormRound) actions.push('storm');
-  if (enemy.def.kind === 'elite' && state.round % 2 === 0) actions.push('storm');
-  if (state.round % 3 === 0) actions.push('guard');
-  if (enemy.def.kind === 'boss' && enemy.phase >= 2 && state.round % 2 === 0) actions.push('deluge');
+  const rule = enemy.def.bossRule;
+  if (enemy.def.kind === 'boss' && rule) {
+    if (rule === 'storm') {
+      if (state.round % 2 === 0 || enemy.phase >= 2) actions.push('storm');
+      if (enemy.phase >= 2 && state.round % 2 === 0) actions.push('deluge');
+    } else if (rule === 'heat') {
+      if (enemy.phase >= 2 || state.round % 2 === 0) actions.push('heat_wave');
+    } else if (rule === 'lock') {
+      if (state.round % 2 === 0) actions.push('lock');
+      if (enemy.phase >= 2) actions.push('storm');
+    } else if (rule === 'record') {
+      if (state.round % 2 === 0) actions.push('record');
+      if (enemy.phase >= 2) actions.push('storm');
+    } else if (rule === 'thunder') {
+      if (enemy.phase >= 2 && state.round % 2 === 0) actions.push('storm');
+      if (enemy.phase >= 3) actions.push('overload');
+    }
+  } else {
+    const stormRound = state.round % 2 === 0;
+    if (enemy.def.kind === 'elite' && stormRound) actions.push('storm');
+  }
+  if (state.round % 3 === 0 && rule !== 'thunder') actions.push('guard');
   return actions;
 }
 
 function intentText(action: EnemyActionId, enemy: EnemyDef): string {
+  if (action === 'heat_wave') return '「锅气爆炒」：全队受热并叠加脆弱';
+  if (action === 'lock') return '「桥面封锁」：下一回合支援与连携不可用';
+  if (action === 'record') return '「抄录招式」：重复上一招会被反制';
+  if (action === 'overload') return '「全域过载」：全队受创，主脑进入最终阶段';
   if (enemy.kind === 'boss') {
     if (action === 'storm') return '「暴雨压境」：无遮蔽者会被淋透';
     if (action === 'deluge') return '「积水成渊」：全队受创并叠加潮湿';
     if (action === 'gather') return '「蓄势」：下一击更重';
-    if (action === 'guard') return '「收伞」：架起护盾';
+    if (action === 'guard') return '「收拢」：架起护盾';
     return '「雷点」：单体雷击';
   }
   if (action === 'guard') return '收起身体，准备防守';
@@ -240,10 +278,10 @@ function intentText(action: EnemyActionId, enemy: EnemyDef): string {
 
 export function estimateEnemyDamage(state: ExpeditionBattleState, action: EnemyActionId): number {
   const enemy = state.enemy;
-  if (action === 'guard' || action === 'gather') return 0;
+  if (action === 'guard' || action === 'gather' || action === 'lock' || action === 'record') return 0;
   const active = activeCreature(state);
-  if (action === 'storm' || action === 'deluge') {
-    const base = action === 'deluge' ? 16 : 9;
+  if (action === 'storm' || action === 'deluge' || action === 'heat_wave' || action === 'overload') {
+    const base = action === 'deluge' ? 16 : action === 'overload' ? 20 : action === 'heat_wave' ? 13 : 9;
     const raw = base + 0.3 * enemy.def.atk + enemy.charge * 0.4;
     let damage = Math.round(raw * V2_RULES.damageScale);
     if (statusOf(active.statuses, 'guard') > 0) damage = Math.round(damage * 0.5);
@@ -257,15 +295,19 @@ export function estimateEnemyDamage(state: ExpeditionBattleState, action: EnemyA
 
 export function chooseRuleIntent(state: ExpeditionBattleState): EnemyIntent {
   const legal = legalEnemyActions(state);
-  const enemy = state.enemy;
+  const rule = state.enemy.def.bossRule;
   let action: EnemyActionId;
-  if (enemy.phase >= 2 && legal.includes('deluge') && state.round % 2 === 0) action = 'deluge';
+  if (rule === 'thunder' && state.enemy.phase >= 3 && legal.includes('overload')) action = 'overload';
+  else if (rule === 'heat' && legal.includes('heat_wave') && state.round % 2 === 0) action = 'heat_wave';
+  else if (rule === 'lock' && legal.includes('lock') && state.round % 2 === 0) action = 'lock';
+  else if (rule === 'record' && legal.includes('record') && state.round % 2 === 0) action = 'record';
+  else if (legal.includes('deluge') && state.enemy.phase >= 2 && state.round % 2 === 0) action = 'deluge';
   else if (legal.includes('storm') && state.round % 2 === 0) action = 'storm';
   else if (legal.includes('guard') && state.round % 3 === 0) action = 'guard';
   else action = 'strike';
   return {
     action,
-    text: intentText(action, enemy.def),
+    text: intentText(action, state.enemy.def),
     estimate: estimateEnemyDamage(state, action),
     source: 'rule',
   };
@@ -317,7 +359,7 @@ export function getLegalMainActions(state: ExpeditionBattleState): Array<{ kind:
 export function getLegalSupportActions(
   state: ExpeditionBattleState,
 ): Array<{ kind: 'support'; reserveIndex: number } | { kind: 'link'; linkId: string }> {
-  if (state.outcome) return [];
+  if (state.outcome || state.round <= state.supportLockedRound) return [];
   const actions: Array<{ kind: 'support'; reserveIndex: number } | { kind: 'link'; linkId: string }> = [];
   for (const index of aliveReserveIndexes(state)) {
     const reserve = state.team[index];
@@ -328,6 +370,7 @@ export function getLegalSupportActions(
   }
   if (!state.linkUsed && state.resonance >= V2_RULES.linkCost) {
     for (const link of LINK_BY_ID.values()) {
+      if ((link.minBond ?? 0) > state.bondLevel) continue;
       const hasPaths = link.requires.every((path) => state.team.some((member) => member.alive && member.creature.buildPath === path));
       if (hasPaths) actions.push({ kind: 'link', linkId: link.id });
     }
@@ -378,6 +421,9 @@ function dealDamageToEnemy(state: ExpeditionBattleState, raw: number): number {
     }
   }
   state.enemy.hp = Math.max(0, state.enemy.hp - damage);
+  if (state.enemy.def.bossRule === 'heat' && damage > 0) {
+    state.enemy.statuses = addStatus(state.enemy.statuses, 'heat', 1, 99);
+  }
   return damage;
 }
 
@@ -406,6 +452,17 @@ function applyActiveSkill(state: ExpeditionBattleState, module: ActiveModule): v
   const active = activeCreature(state);
   const enemy = state.enemy;
   if (module.cost > state.resonance) throw new Error('共鸣不足');
+  // 樱信档案员：重复被记录的招式会被反制
+  if (state.recordedSkill && state.recordedSkill === module.id) {
+    enemy.charge += 8;
+    state.recordedSkill = undefined;
+    logEvent(state, {
+      round: state.round,
+      kind: 'enemy',
+      actor: 'enemy',
+      text: `档案员复写了「${module.name}」：敌方蓄势 +8`,
+    });
+  }
   state.resonance -= module.cost;
   active.cooldowns[module.id] = module.cooldown;
 
@@ -581,6 +638,27 @@ function applyLink(state: ExpeditionBattleState, linkId: string): void {
       text: `连携「${link.name}」：造成 ${applied} 伤害并束缚敌方`,
       detail: link.text,
     });
+  } else if (link.id === 'LINK_FERRY') {
+    for (const member of state.team.filter((item) => item.alive)) {
+      member.hp = Math.min(member.creature.stats.hp, member.hp + 8);
+      member.statuses = removeStatus(member.statuses, 'wet');
+    }
+    addResonance(state, 1);
+    logEvent(state, { round: state.round, kind: 'link', actor: 'player', text: `连携「${link.name}」：全队回复 8 HP，清除潮湿，共鸣 +1`, detail: link.text });
+  } else if (link.id === 'LINK_CHARGE') {
+    const active = activeCreature(state);
+    active.statuses = addStatus(active.statuses, 'charge', 2, 3);
+    state.enemy.statuses = addStatus(state.enemy.statuses, 'vulnerable', 1, 2);
+    logEvent(state, { round: state.round, kind: 'link', actor: 'player', text: `连携「${link.name}」：主战蓄力 2 层，敌方脆弱`, detail: link.text });
+  } else if (link.id === 'LINK_LANTERN') {
+    for (const member of state.team.filter((item) => item.alive)) member.statuses = addStatus(member.statuses, 'shield', 8, 3);
+    state.enemy.statuses = addStatus(state.enemy.statuses, 'mark', 1, 2);
+    logEvent(state, { round: state.round, kind: 'link', actor: 'player', text: `连携「${link.name}」：全队 8 护盾，敌方被标记`, detail: link.text });
+  } else if (link.id === 'LINK_RIVER') {
+    const applied = dealDamageToEnemy(state, 10);
+    for (const member of state.team.filter((item) => item.alive)) member.hp = Math.min(member.creature.stats.hp, member.hp + 6);
+    addResonance(state, 2);
+    logEvent(state, { round: state.round, kind: 'link', actor: 'player', text: `连携「${link.name}」：造成 ${applied} 伤害，全队回复 6，共鸣 +2`, detail: link.text });
   }
 }
 
@@ -610,25 +688,46 @@ function enemyAct(state: ExpeditionBattleState): void {
     logEvent(state, { round: state.round, kind: 'enemy', actor: 'enemy', text: `${enemy.def.name} 蓄势待发（下一击 +10）` });
     return;
   }
+  if (action === 'lock') {
+    state.supportLockedRound = state.round + 1;
+    logEvent(state, {
+      round: state.round,
+      kind: 'enemy',
+      actor: 'enemy',
+      text: `${enemy.def.name} 封锁桥面：下一回合支援与连携不可用`,
+    });
+    return;
+  }
+  if (action === 'record') {
+    state.recordedSkill = active.lastSkillId;
+    logEvent(state, {
+      round: state.round,
+      kind: 'enemy',
+      actor: 'enemy',
+      text: `${enemy.def.name} 抄录了${active.lastSkillId ? '你的上一招' : '你的动作'}：重复使用会被反制`,
+    });
+    return;
+  }
   if (action === 'guard') {
     enemy.shield += 12;
     logEvent(state, { round: state.round, kind: 'enemy', actor: 'enemy', text: `${enemy.def.name} 收拢防御，获得 12 护盾` });
     return;
   }
 
-  const isStorm = action === 'storm' || action === 'deluge';
+  const isStorm = action === 'storm' || action === 'deluge' || action === 'heat_wave' || action === 'overload';
   const activeHasCover = statusOf(active.statuses, 'guard') > 0 || statusOf(active.statuses, 'shield') > 0;
   if (isStorm) {
-    const base = action === 'deluge' ? 16 : 9;
-    const damage = clamp(Math.round((base + 0.3 * enemy.def.atk + enemy.charge * 0.4) * V2_RULES.damageScale), 3, 40);
+    const base = action === 'deluge' ? 16 : action === 'overload' ? 20 : action === 'heat_wave' ? 13 : 9;
+    const damage = clamp(Math.round((base + 0.3 * enemy.def.atk + enemy.charge * 0.4) * V2_RULES.damageScale), 3, 46);
     enemy.charge = 0;
     const covered = activeHasCover;
     const actual = covered ? Math.round(damage * 0.4) : damage;
+    const actionName = ENEMY_ACTION_LABEL[action];
     logEvent(state, {
       round: state.round,
       kind: 'enemy',
       actor: 'enemy',
-      text: `${enemy.def.name} 发动「${action === 'deluge' ? '积水成渊' : '暴雨'}」${covered ? '，被遮蔽挡下大半' : ''}`,
+      text: `${enemy.def.name} 发动「${actionName}」${covered ? '，被遮蔽挡下大半' : ''}`,
       damage: actual,
     });
     for (const member of state.team.filter((item) => item.alive)) {
@@ -641,7 +740,8 @@ function enemyAct(state: ExpeditionBattleState): void {
       if (member === active) {
         member.hp = Math.max(0, member.hp);
         if (dealt > 0) {
-          member.statuses = addStatus(member.statuses, 'wet', action === 'deluge' ? 2 : 1, 2);
+          if (action === 'heat_wave') member.statuses = addStatus(member.statuses, 'vulnerable', 1, 2);
+          else member.statuses = addStatus(member.statuses, 'wet', action === 'deluge' ? 2 : 1, 2);
           if (member.creature.passiveId === 'P06' && !member.passiveUsed) {
             member.passiveUsed = true;
             addResonance(state, 2);
@@ -673,6 +773,38 @@ function enemyAct(state: ExpeditionBattleState): void {
 }
 
 /* ------------------------------- 回合结算 ------------------------------- */
+
+function advanceBossPhase(state: ExpeditionBattleState): void {
+  const enemy = state.enemy;
+  if (enemy.def.kind !== 'boss') return;
+  const rule = enemy.def.bossRule;
+  const ratio = enemy.hp / Math.max(1, enemy.def.maxHp);
+  const targetPhase = rule === 'thunder' ? (ratio <= 1 / 3 ? 3 : ratio <= 2 / 3 ? 2 : 1) : ratio <= 0.5 ? 2 : 1;
+  if (rule === 'heat' && statusOf(enemy.statuses, 'heat') >= 3) {
+    enemy.phase = Math.max(enemy.phase, 2);
+  } else if (targetPhase > enemy.phase) {
+    enemy.phase = targetPhase;
+  }
+}
+
+function announceBossPhase(state: ExpeditionBattleState, previousPhase: number): void {
+  const phase = state.enemy.phase;
+  if (phase <= previousPhase) return;
+  const rule = state.enemy.def.bossRule;
+  const text =
+    rule === 'thunder'
+      ? phase >= 3
+        ? '主脑进入第三阶段：全域过载'
+        : '主脑进入第二阶段：线圈过热'
+      : rule === 'heat'
+        ? '大厨掀开最后一口锅：火力全开'
+        : rule === 'lock'
+          ? '桥影落下：支援被拦在桥外'
+          : rule === 'record'
+            ? '档案员翻到最后一页：开始复写'
+            : '进入第二阶段：积水成渊';
+  state.log.push({ round: state.round, kind: 'status', text: `${state.enemy.def.name} ${text}`, actor: 'enemy' });
+}
 
 function checkOutcome(state: ExpeditionBattleState): BattleOutcomeV2 | null {
   if (state.enemy.hp <= 0) return 'win';
@@ -809,17 +941,10 @@ export function resolveRound(state: ExpeditionBattleState, input: PlayerRoundInp
       ...(intent.model ? { model: intent.model } : {}),
       ...(typeof intent.latencyMs === 'number' ? { latencyMs: intent.latencyMs } : {}),
     });
-    // Boss 阶段转换：HP ≤ 50% 进入 P2，意图与机制升级
-    if (next.enemy.def.kind === 'boss' && next.enemy.phase === 1 && next.enemy.hp <= next.enemy.def.maxHp / 2) {
-      next.enemy.phase = 2;
-      next.log.push({
-        round: next.round,
-        kind: 'status',
-        text: `${next.enemy.def.name} 进入第二阶段：积水成渊`,
-        detail: '暴雨更频繁，换位代价变化',
-        actor: 'enemy',
-      });
-    }
+    // Boss 阶段转换：不同 Boss 有 2 或 3 个阶段
+    const beforePhase = next.enemy.phase;
+    advanceBossPhase(next);
+    announceBossPhase(next, beforePhase);
   }
 
   // 状态衰减与冷却
@@ -954,3 +1079,5 @@ export function creatureHasTag(creature: V2Creature, tag: string): boolean {
 export function pathName(creature: V2Creature): string {
   return PATH_META[creature.buildPath].name;
 }
+
+

@@ -1,6 +1,6 @@
 import { ACTIVE_MODULES, LINKS, PASSIVE_MODULES, SUPPORT_COMMANDS } from './modules';
 import { ALL_TAGS, BUILD_PATHS, isBuildPath, isTag } from '../domain/tags';
-import { ENEMIES, EVENTS, RIVER_REGION } from '../domain/region';
+import { ENEMIES, EVENTS, REGIONS, REGION_ORDER } from '../domain/region';
 
 export type ContentIssue = { level: 'error' | 'warn'; message: string };
 
@@ -41,11 +41,13 @@ export function validateContent(): ContentIssue[] {
     if (enemy.maxHp < 20 || enemy.maxHp > 400) issues.push({ level: 'error', message: `${enemy.id} HP 越界` });
     if (!isTag(enemy.element)) issues.push({ level: 'warn', message: `${enemy.id} 属性不是标签（允许）` });
   }
-  for (const node of RIVER_REGION.nodes) {
-    if (node.eventId && !EVENTS[node.eventId]) issues.push({ level: 'error', message: `${node.id} 引用不存在的事件 ${node.eventId}` });
-    if (node.enemyId && !ENEMIES[node.enemyId]) issues.push({ level: 'error', message: `${node.id} 引用不存在的敌人 ${node.enemyId}` });
-    if ((node.type === 'battle' || node.type === 'elite' || node.type === 'boss') && !node.enemyId) {
-      issues.push({ level: 'error', message: `${node.id} 战斗节点缺少敌人` });
+  for (const regionId of REGION_ORDER) {
+    for (const node of REGIONS[regionId].nodes) {
+      if (node.eventId && !EVENTS[node.eventId]) issues.push({ level: 'error', message: `${node.id} 引用不存在的事件 ${node.eventId}` });
+      if (node.enemyId && !ENEMIES[node.enemyId]) issues.push({ level: 'error', message: `${node.id} 引用不存在的敌人 ${node.enemyId}` });
+      if ((node.type === 'battle' || node.type === 'elite' || node.type === 'boss') && !node.enemyId) {
+        issues.push({ level: 'error', message: `${node.id} 战斗节点缺少敌人` });
+      }
     }
   }
   for (const event of Object.values(EVENTS)) {

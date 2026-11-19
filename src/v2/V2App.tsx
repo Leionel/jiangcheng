@@ -1,10 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { BuildPath, ExpeditionBattleState, RegionRunState, SaveV2, Tag, V2Creature } from './domain/types';
+import type { BuildPath, ExpeditionBattleState, RegionId, RegionRunState, SaveV2, Tag, V2Creature } from './domain/types';
 import { compileCreature } from './domain/compile';
 import { inferTags, mergeEvidence, recommendPaths, toggleConfirmed } from './domain/tags';
-import { addCreature, exportSave, importSave, loadSave, persistSave, recordBattleResult, setEquipped, toggleLock } from './domain/save';
-import { createRegionRun, applyEventChoice, advanceEventNode, completeNode, currentNode, getEnemy, RIVER_REGION } from './domain/region';
 import {
+  addCreature,
+  applyBattleGrowth,
+  bindLinkStat,
+  bondLevelOf,
+  completeRegion,
+  deevolveCreature,
+  evolveCreature,
+  exportSave,
+  getActiveRun,
+  importSave,
+  loadSave,
+  patchRegionRun,
+  persistSave,
+  recordBattleResult,
+  setActiveRegion,
+  setEquipped,
+  startRegionRun,
+  toggleLock,
+} from './domain/save';
+import { applyEventChoice, advanceEventNode, completeNode, currentNode, getEnemy, getRegion, REGIONS } from './domain/region';
+import {
+  ENEMY_ACTION_LABEL,
   applyEnemyPlan,
   createExpeditionBattle,
   estimateEnemyDamage,
@@ -20,19 +40,17 @@ import { hashString } from '../shared/rng';
 import { MonsterSprite } from '../features/monsters/MonsterSprite';
 import { CaptureView2, type CaptureDraft } from './views/CaptureView2';
 import { BattleView2 } from './views/BattleView2';
-import { BattleResult, CodexView, PartyWorkshop, RegionMap } from './views/Panels';
-import type { EnemyActionId, EnemyDef, PlayerMainAction, PlayerSupportAction, RegionNodeDef } from './domain/types';
+import { BattleResult, CodexView, PartyWorkshop, QuestPanel, RegionMap } from './views/Panels';
+import { branchesFor, evolutionGroupFor, previewEvolution } from './domain/evolution';
+import { grantXp } from './domain/growth';
+import { claimQuest, QUEST_BY_ID } from './domain/quests';
+import { buildChallengeCode } from './domain/challenge';
+import type { EnemyDef, PlayerMainAction, PlayerSupportAction, RegionNodeDef } from './domain/types';
 import './styles/v2.css';
 
-type Screen = 'capture' | 'party' | 'map' | 'battle' | 'result' | 'codex';
+type Screen = 'capture' | 'party' | 'map' | 'battle' | 'result' | 'codex' | 'quests';
 
-const ACTION_LABEL: Record<EnemyActionId, string> = {
-  strike: '单体攻击',
-  guard: '收拢防御',
-  gather: '蓄势',
-  storm: '暴雨',
-  deluge: '积水成渊',
-};
+const ACTION_LABEL = ENEMY_ACTION_LABEL;
 
 function newSeed(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -52,9 +70,13 @@ export function V2App() {
   const [planning, setPlanning] = useState(false);
   const [result, setResult] = useState<{ battle: ExpeditionBattleState; run: RegionRunState } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [selectedRegionId, setSelectedRegionId] = useState<RegionId>(() => loadSave().activeRegionId);
+  const [evolveId, setEvolveId] = useState<string | null>(null);
   const resultRef = useRef(false);
 
+  const activeRun = getActiveRun(save);
   const preferLive = Boolean(health?.aiAvailable && save.settings.aiMode === 'auto');
+  const evolveCreatureData = evolveId ? save.collection.find((item) => item.id === evolveId) ?? null : null;
 
   const commit = useCallback((next: SaveV2) => {
     setSave(next);
@@ -65,6 +87,10 @@ export function V2App() {
     setToast(message);
     window.setTimeout(() => setToast(null), 2800);
   }, []);
+
+  useEffect(() => {
+    setSelectedRegionId(save.activeRegionId);
+  }, [save.activeRegionId]);
 
   useEffect(() => {
     let alive = true;
@@ -238,16 +264,26 @@ export function V2App() {
     [save, commit],
   );
 
-  const startRun = useCallback(() => {
-    if (save.party.ids.length < 3) {
-      showToast('先凑满 3 只再出发');
-      setScreen('party');
-      return;
-    }
-    const run = createRegionRun(newSeed('river'));
-    commit({ ...save, run });
-    setScreen('map');
-  }, [save, commit, showToast]);
+  const startRun = useCallback(
+    (regionId: RegionId = selectedRegionId) => {
+      if (save.party.ids.length < 3) {
+        showToast('先凑满 3 只再出发');
+        setScreen('party');
+        return;
+      }
+      if (!save.unlockedRegions.includes(regionId)) {
+        const region = REGIONS[regionId];
+        const previous = region.unlockAfter ? REGIONS[region.unlockAfter] : null;
+        showToast(previous ? `先完成「${previous.name}」解锁这里` : '这个区域还没有解锁');
+        return;
+      }
+      const next = startRegionRun(save, regionId, newSeed(regionId));
+      commit(next);
+      setSelectedRegionId(regionId);
+      setScreen('map');
+    },
+    [save, selectedRegionId, commit, showToast],
+  );
 
   /* ------------------------------ 地图/战斗 ------------------------------ */
 
@@ -261,28 +297,29 @@ export function V2App() {
 
   const chooseEvent = useCallback(
     (eventId: string, choiceId: string) => {
-      if (!save.run) return;
-      const afterChoice = applyEventChoice(save.run, eventId, choiceId);
+      if (!activeRun) return;
+      const afterChoice = applyEventChoice(activeRun, eventId, choiceId);
       const advanced = advanceEventNode(afterChoice);
-      commit({ ...save, run: advanced });
+      commit(patchRegionRun(save, advanced));
     },
-    [save, commit],
+    [save, activeRun, commit],
   );
 
   const startBattle = useCallback(
     (node: RegionNodeDef, enemy: EnemyDef) => {
-      if (!save.run) return;
+      if (!activeRun) return;
       if (partyCreatures.length < 3) {
         showToast('队伍不足 3 只，先去队伍工坊');
         setScreen('party');
         return;
       }
       const next = createExpeditionBattle({
-        seed: newSeed(`${save.run.seed}-${node.id}`),
+        seed: newSeed(`${activeRun.seed}-${node.id}`),
         team: partyCreatures,
         enemy,
-        startResonance: save.run.startResonance,
+        startResonance: activeRun.startResonance,
         activeIndex: save.party.activeIndex,
+        bondLevel: bondLevelOf(save),
       });
       resultRef.current = false;
       setBattle(next);
@@ -291,16 +328,16 @@ export function V2App() {
       setPlanning(false);
       setScreen('battle');
     },
-    [save, partyCreatures, showToast],
+    [save, activeRun, partyCreatures, showToast],
   );
 
   const enterCurrentBattle = useCallback(() => {
-    if (!save.run) return;
-    const node = currentNode(save.run);
+    if (!activeRun) return;
+    const node = currentNode(activeRun);
     const enemy = getEnemy(node.enemyId);
     if (node.type === 'event' || !enemy) return;
     startBattle(node, enemy);
-  }, [save.run, startBattle]);
+  }, [activeRun, startBattle]);
 
   /* AI 导演：每回合在合法动作中选招；超时/失败规则接管 */
   useEffect(() => {
@@ -364,29 +401,42 @@ export function V2App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [battle?.round, battle?.outcome, preferLive]);
 
-  /* 战斗结束：结算战绩 + 推进区域 */
+  /* 战斗结束：结算战绩 + 成长 + 推进区域 + 解锁下一区 */
   useEffect(() => {
-    if (!battle?.outcome || !save.run || resultRef.current) return;
+    if (!battle?.outcome || !activeRun || resultRef.current) return;
     resultRef.current = true;
     const outcome = battle.outcome;
+    const node = currentNode(activeRun);
     let nextSave = recordBattleResult(save, save.party.ids, outcome);
-    let nextRun = save.run;
+    const growth = applyBattleGrowth(nextSave, {
+      partyIds: save.party.ids,
+      outcome,
+      enemyKind: battle.enemy.def.kind,
+      nodeKey: `${activeRun.regionId}:${node.id}`,
+    });
+    nextSave = growth.save;
+    if (battle.linkUsed) nextSave = bindLinkStat(nextSave);
+    let nextRun = activeRun;
     if (outcome === 'win') {
-      nextRun = completeNode(save.run, battle.rewards);
+      nextRun = completeNode(activeRun, battle.rewards);
       nextSave = {
         ...nextSave,
-        run: nextRun,
         materials: nextSave.materials + battle.rewards.materials,
         tokens: nextSave.tokens + battle.rewards.tokens,
-        regionClears: nextSave.regionClears + (nextRun.completed && !save.run.completed ? 1 : 0),
       };
-    } else {
-      nextSave = { ...nextSave, run: nextRun };
+      nextSave = patchRegionRun(nextSave, nextRun);
+      if (nextRun.completed) {
+        const beforeUnlocked = new Set(nextSave.unlockedRegions);
+        nextSave = completeRegion(nextSave, nextRun);
+        const newRegion = nextSave.unlockedRegions.find((id) => !beforeUnlocked.has(id));
+        if (newRegion) showToast(`新区域解锁：「${REGIONS[newRegion].name}」`);
+      }
     }
+    if (growth.levelsGained > 0) showToast(`队伍升级 +${growth.levelsGained}（经验 +${growth.xpGained}）`);
     commit(nextSave);
     setResult({ battle, run: nextRun });
     setScreen('result');
-  }, [battle, save, commit]);
+  }, [battle, save, activeRun, commit, showToast]);
 
   const resolveMain = useCallback(
     (action: PlayerMainAction) => {
@@ -410,11 +460,6 @@ export function V2App() {
   }, [enterCurrentBattle]);
 
   /* ------------------------------ 图鉴/设置 ------------------------------ */
-
-  const toggleAiMode = useCallback(() => {
-    const aiMode = save.settings.aiMode === 'auto' ? 'demo' : 'auto';
-    commit({ ...save, settings: { ...save.settings, aiMode } });
-  }, [save, commit]);
 
   const handleExport = useCallback(() => {
     const blob = new Blob([exportSave(save)], { type: 'application/json' });
@@ -441,18 +486,120 @@ export function V2App() {
   );
 
   const openMap = useCallback(() => {
-    if (!save.run) {
-      showToast('还没有探索进度：先去队伍工坊出发');
-      setScreen('party');
+    setSelectedRegionId(save.activeRegionId);
+    setScreen('map');
+  }, [save.activeRegionId]);
+
+  const selectRegion = useCallback(
+    (regionId: RegionId) => {
+      setSelectedRegionId(regionId);
+      if (save.regionRuns[regionId] && save.activeRegionId !== regionId) {
+        commit(setActiveRegion(save, regionId));
+      }
+    },
+    [save, commit],
+  );
+
+  const restartRun = useCallback(
+    (regionId: RegionId) => {
+      const next = startRegionRun(save, regionId, newSeed(regionId));
+      commit(next);
+      setSelectedRegionId(regionId);
+      setScreen('map');
+      showToast(`重新探索「${REGIONS[regionId].name}」`);
+    },
+    [save, commit, showToast],
+  );
+
+  const openEvolution = useCallback((id: string) => {
+    setEvolveId(id);
+  }, []);
+
+  const handleEvolve = useCallback(
+    (branchId: string) => {
+      if (!evolveCreatureData) return;
+      if (evolveCreatureData.level < 3) {
+        showToast('熟练度不足：先练到 3 级');
+        return;
+      }
+      if (save.tokens < 1) {
+        showToast('进化需要 1 个信物');
+        return;
+      }
+      const next = evolveCreature(save, evolveCreatureData.id, branchId);
+      if (next === save) {
+        showToast('现在还不能进化');
+        return;
+      }
+      commit(next);
+      setEvolveId(null);
+      showToast(`「${evolveCreatureData.name}」完成进化`);
+    },
+    [save, commit, evolveCreatureData, showToast],
+  );
+
+  const handleDeevolve = useCallback(() => {
+    if (!evolveCreatureData) return;
+    if (save.tokens < 1) {
+      showToast('回退需要 1 个信物');
       return;
     }
-    setScreen('map');
-  }, [save.run, showToast]);
+    const next = deevolveCreature(save, evolveCreatureData.id);
+    if (next === save) {
+      showToast('没有可以回退的进化');
+      return;
+    }
+    commit(next);
+    setEvolveId(null);
+    showToast('已回退到进化前');
+  }, [save, commit, evolveCreatureData, showToast]);
+
+  const handleClaimQuest = useCallback(
+    (questId: string) => {
+      const next = claimQuest(save, questId);
+      if (next === save) {
+        showToast('奖励还不能领取');
+        return;
+      }
+      const quest = QUEST_BY_ID.get(questId);
+      let after = next;
+      if (quest?.reward.xp) {
+        after = {
+          ...after,
+          collection: after.collection.map((item) =>
+            save.party.ids.includes(item.id) ? grantXp(item, quest.reward.xp!).creature : item,
+          ),
+        };
+      }
+      commit(after);
+      showToast('任务奖励已领取');
+    },
+    [save, commit, showToast],
+  );
+
+  const handleShare = useCallback(() => {
+    const code = buildChallengeCode(save, activeRun?.seed ?? 'preview');
+    const copy = async () => {
+      try {
+        await navigator.clipboard.writeText(code);
+        showToast('挑战码已复制到剪贴板');
+      } catch {
+        showToast(code);
+      }
+    };
+    void copy();
+  }, [save, activeRun?.seed, showToast]);
+
+  const toggleAiMode = useCallback(() => {
+    const aiMode = save.settings.aiMode === 'auto' ? 'demo' : 'auto';
+    commit({ ...save, settings: { ...save.settings, aiMode } });
+  }, [save, commit]);
 
   const nav: Array<{ key: Screen; label: string; onClick: () => void }> = [
     { key: 'capture', label: '捕获站', onClick: () => setScreen('capture') },
     { key: 'party', label: '我的队伍', onClick: () => setScreen('party') },
     { key: 'map', label: '江城地图', onClick: openMap },
+    { key: 'quests', label: '任务', onClick: () => setScreen('quests') },
     { key: 'codex', label: '图鉴', onClick: () => setScreen('codex') },
   ];
 
@@ -516,27 +663,29 @@ export function V2App() {
             onToggleParty={toggleParty}
             onSetActive={setActive}
             onToggleEquip={toggleEquip}
-            onStartRun={startRun}
+            onStartRun={openMap}
             onOpenCapture={() => setScreen('capture')}
             onOpenCodex={() => setScreen('codex')}
+            onOpenEvolution={openEvolution}
           />
         ) : null}
 
-        {screen === 'map' && save.run ? (
+        {screen === 'map' ? (
           <RegionMap
-            run={save.run}
+            save={save}
+            selectedRegionId={selectedRegionId}
+            onSelectRegion={selectRegion}
             onChooseEvent={chooseEvent}
             onEnterBattle={(node, enemy) => startBattle(node, enemy)}
-            onRestartRun={() => {
-              const run = createRegionRun(newSeed('river'));
-              commit({ ...save, run });
-              setScreen('map');
-            }}
+            onStartRegion={startRun}
+            onRestartRun={restartRun}
             onOpenParty={() => setScreen('party')}
             onOpenCodex={() => setScreen('codex')}
             onOpenCapture={() => setScreen('capture')}
           />
         ) : null}
+
+        {screen === 'quests' ? <QuestPanel save={save} onClaim={handleClaimQuest} /> : null}
 
         {screen === 'battle' && battle ? (
           <BattleView2
@@ -549,7 +698,7 @@ export function V2App() {
             onSupport={setSupport}
             onExit={() => {
               setBattle(null);
-              setScreen(save.run ? 'map' : 'party');
+              setScreen('map');
             }}
           />
         ) : null}
@@ -580,6 +729,7 @@ export function V2App() {
             onOpenCapture={() => setScreen('capture')}
             onExport={handleExport}
             onImport={handleImport}
+            onShare={handleShare}
           />
         ) : null}
         </div>
@@ -589,7 +739,9 @@ export function V2App() {
         <span>原创虚构世界 · 五区内容分阶段接入 · 非官方服务</span>
         <span>
           {save.collection.length} 只造物 · {save.legacyCards.length} 张旧卡 · 材料 {save.materials} · 信物 {save.tokens}
-          {save.run ? ` · 当前 ${RIVER_REGION.name} 节点 ${Math.min(save.run.nodeIndex + 1, RIVER_REGION.nodes.length)}/${RIVER_REGION.nodes.length}` : ''}
+          {activeRun
+            ? ` · ${getRegion(activeRun.regionId).name} 节点 ${Math.min(activeRun.nodeIndex + 1, getRegion(activeRun.regionId).nodes.length)}/${getRegion(activeRun.regionId).nodes.length}`
+            : ''}
         </span>
       </footer>
 
@@ -613,6 +765,68 @@ export function V2App() {
         </div>
       ) : null}
 
+      {evolveCreatureData ? (
+        <div className="v2-summon-overlay" role="dialog" aria-modal="true" aria-label="成长与进化">
+          <div className="v2-evolve-panel">
+            <div className="v2-panel-head">
+              <div>
+                <p className="v2-rubric">成长记录 · {evolutionGroupFor(evolveCreatureData).name}</p>
+                <h3 className="v2-h3">{evolveCreatureData.name} · Lv.{evolveCreatureData.level}</h3>
+                <p className="fineprint">
+                  {evolveCreatureData.evolutionId
+                    ? `已进化：${evolveCreatureData.evolutionId}`
+                    : evolveCreatureData.level >= 3
+                      ? '达到 3 级，可以消耗 1 个信物选择一条进化分支。'
+                      : '达到 3 级后解锁进化；可去区域战斗积累经验。'}
+                </p>
+              </div>
+              <button type="button" className="v2-btn v2-btn-sm" onClick={() => setEvolveId(null)}>关闭</button>
+            </div>
+            <div className="v2-specimen-stats">
+              <span><em>HP</em><b>{evolveCreatureData.stats.hp}</b></span>
+              <span><em>ATK</em><b>{evolveCreatureData.stats.atk}</b></span>
+              <span><em>DEF</em><b>{evolveCreatureData.stats.def}</b></span>
+              <span><em>SPD</em><b>{evolveCreatureData.stats.spd}</b></span>
+            </div>
+            {evolveCreatureData.evolutionId ? (
+              <div className="v2-evolve-current">
+                <p className="fineprint">回退会恢复进化前的属性、技能与配色，消耗 1 个信物。</p>
+                <button type="button" className="v2-btn" onClick={handleDeevolve} disabled={save.tokens < 1}>回退进化（信物 1）</button>
+              </div>
+            ) : (
+              <div className="v2-evolve-grid">
+                {branchesFor(evolveCreatureData).map((branch) => {
+                  const preview = previewEvolution(evolveCreatureData, branch);
+                  return (
+                    <div className="v2-evolve-card" key={branch.id}>
+                      <span className="v2-badge" data-kind="path">{PATH_LABEL[branch.path]}</span>
+                      <b>{preview.name}</b>
+                      <p className="fineprint">{preview.desc}</p>
+                      <div className="v2-specimen-stats">
+                        <span><em>HP</em><b>{preview.stats.hp}</b></span>
+                        <span><em>ATK</em><b>{preview.stats.atk}</b></span>
+                        <span><em>DEF</em><b>{preview.stats.def}</b></span>
+                        <span><em>SPD</em><b>{preview.stats.spd}</b></span>
+                      </div>
+                      <p className="fineprint">获得技能：{preview.module?.name} · {preview.module?.text}</p>
+                      <button
+                        type="button"
+                        className="v2-btn v2-btn-primary"
+                        disabled={evolveCreatureData.level < 3 || save.tokens < 1}
+                        onClick={() => handleEvolve(branch.id)}
+                      >
+                        选择这条进化（信物 1）
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <p className="fineprint">当前信物：{save.tokens}。进化会立即改变属性、技能与外观配色；可在同一面板回退。</p>
+          </div>
+        </div>
+      ) : null}
+
       {toast ? <div className="v2-toast">{toast}</div> : null}
     </div>
   );
@@ -625,3 +839,7 @@ const PATH_LABEL: Record<BuildPath, string> = {
   support: '支援',
   mover: '机动',
 };
+
+
+
+

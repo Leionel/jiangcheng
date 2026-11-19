@@ -1,20 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { CrestKind } from '../../shared/types';
-import type { ExpeditionBattleState, EnemyActionId, PlayerMainAction, PlayerSupportAction, StatusStack } from '../domain/types';
-import { activeCreature, getLegalMainActions, getLegalSupportActions } from '../domain/battle2';
+import type { ExpeditionBattleState, PlayerMainAction, PlayerSupportAction, StatusStack } from '../domain/types';
+import { ENEMY_ACTION_LABEL, activeCreature, getLegalMainActions, getLegalSupportActions } from '../domain/battle2';
 import { ACTIVE_BY_ID, LINK_BY_ID, SUPPORT_BY_ID } from '../content/modules';
 import { PATH_META } from '../domain/tags';
 import { ELEMENTS } from '../../features/monsters/elements';
 import { MonsterSprite } from '../../features/monsters/MonsterSprite';
 
-const ACTION_LABEL: Record<EnemyActionId, string> = {
-  strike: '单体攻击',
-  guard: '收拢防御',
-  gather: '蓄势',
-  storm: '暴雨',
-  deluge: '积水成渊',
-};
+const ACTION_LABEL = ENEMY_ACTION_LABEL;
 
 const STATUS_LABEL: Record<string, string> = {
   wet: '潮湿',
@@ -24,6 +18,7 @@ const STATUS_LABEL: Record<string, string> = {
   guard: '防御',
   mark: '标记',
   bind: '束缚',
+  heat: '热度',
 };
 
 const ELEMENT_CREST: Record<string, CrestKind> = {
@@ -395,3 +390,6 @@ export function BattleView2({
     </section>
   );
 }
+
+
+

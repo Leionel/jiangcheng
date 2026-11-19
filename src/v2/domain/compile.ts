@@ -23,11 +23,11 @@ const PATH_STATS: Record<BuildPath, CreatureStats> = {
 };
 
 const PATH_ACTIVE_POOL: Record<BuildPath, string[]> = {
-  guardian: ['A01', 'A08', 'A15', 'A13', 'A03', 'A12'],
-  striker: ['A10', 'A07', 'A05', 'A14', 'A04', 'A09'],
-  trickster: ['A02', 'A04', 'A09', 'A05', 'A11', 'A14'],
-  support: ['A12', 'A06', 'A15', 'A08', 'A11', 'A01'],
-  mover: ['A03', 'A11', 'A05', 'A15', 'A07', 'A06'],
+  guardian: ['A01', 'A08', 'A15', 'A13', 'A17', 'A20', 'A24'],
+  striker: ['A10', 'A07', 'A16', 'A21', 'A05', 'A04'],
+  trickster: ['A02', 'A18', 'A22', 'A04', 'A09', 'A11'],
+  support: ['A12', 'A19', 'A23', 'A06', 'A15', 'A08'],
+  mover: ['A03', 'A16', 'A24', 'A11', 'A05', 'A07'],
 };
 
 const PATH_PASSIVE_POOL: Record<BuildPath, string[]> = {
@@ -177,6 +177,11 @@ export function compileCreature(input: CreatureBuildInput): V2Creature {
     source: input.source,
     record: { wins: 0, losses: 0 },
     createdAt: input.createdAt ?? Date.now(),
+    level: input.level ?? 1,
+    xp: input.xp ?? 0,
+    ...(input.evolutionId ? { evolutionId: input.evolutionId } : {}),
+    evolutionHistory: input.evolutionId ? [input.evolutionId] : [],
+    bondXp: 0,
   };
 }
 

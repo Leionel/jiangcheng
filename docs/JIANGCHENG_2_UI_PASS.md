@@ -121,10 +121,10 @@ npm run shots:2           # 真实 AI 全流程 + Boss
 | 项 | 结果 |
 |---|---|
 | `npm run typecheck` | ✅ |
-| `npm test` | ✅ 9 文件 / 67 测试 |
-| `npm run build` | ✅ 主包约 370 kB（gzip ≈121 kB），CSS ≈79 kB（gzip ≈14 kB） |
+| `npm test` | ✅ 16 文件 / 85 测试 |
+| `npm run build` | ✅ 主包约 408 kB（gzip ≈134 kB），CSS ≈84 kB（gzip ≈15 kB） |
 | `npm run shots`（P1 回归） | ✅ 10 步 |
-| `npm run shots:2`（2.0 + 真实 AI + Boss） | ✅ 15 步，Boss 胜，AI 参与 6–8 回合 |
+| `npm run shots:2`（2.0 + 真实 AI + Boss + 二区 + 任务 + 进化） | ✅ 21 步全部通过 |
 | `npm run check:ai` | ✅ analyze / battle-plan / analyze-object / battle-director |
 | design-taste-frontend inspector | 3 FAIL / 4 WARN（见下，均为品牌/题材取舍） |
 
@@ -142,3 +142,4 @@ WARN（可辩护）：无视频（题材不需要）、10 种字号（游戏数�
 - 图标系统还没统一（部分地标是手绘 SVG，后续可抽成 icon set）。
 - 还未做真实用户可用性测试；Batch 2 后拿 3–5 人试玩再调字号/密度。
 - P1 旧版保持原样；如果要在 P1 也套用新字号，需要单独做一次回归（不在本次范围）。
+

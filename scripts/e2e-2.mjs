@@ -217,7 +217,9 @@ try {
   await shot('04-v2-party');
 
   console.log('· 出发 / 地图事件');
-  await clickText('出发 · 江风渡口', '.v2-btn');
+  await clickText('打开江城地图', '.v2-btn');
+  await waitFor('.v2-world-map');
+  await clickText('开始探索 · 江风渡口', '.v2-btn');
   await waitFor('.v2-node-panel');
   await waitFor('.v2-choice');
   await shot('05-v2-map');
@@ -322,7 +324,8 @@ try {
     if (!raw) return false;
     const save = JSON.parse(raw);
     if (!save.run) return false;
-    save.run.nodeIndex = 4;
+    if (save.run) save.run.nodeIndex = 4;
+    if (save.regionRuns?.river) save.regionRuns.river.nodeIndex = 4;
     save.run.completed = false;
     save.run.startResonance = 2;
     localStorage.setItem('jcm.v2.save', JSON.stringify(save));
@@ -368,6 +371,84 @@ try {
   if (!/AI 参与/.test(bossResult)) errors.push('Boss 结算页没有 AI 参与统计');
   await shot('14-v2-boss-result');
 
+  console.log('· 第二区解锁 / 任务 / 进化');
+  await clickText('回到地图', '.v2-btn').catch(async () => {
+    await clickText('回地图', '.v2-btn');
+  });
+  await waitFor('.v2-world-map');
+  const progress = await evaluate(`(() => {
+    const raw = localStorage.getItem('jcm.v2.save');
+    if (!raw) return null;
+    const save = JSON.parse(raw);
+    return { unlocked: save.unlockedRegions, clears: save.stats.regionClears, quests: save.quests };
+  })()`);
+  console.log(`  五区进度：${JSON.stringify(progress)}`);
+  if (progress && !progress.unlocked.includes('zao')) errors.push('江风渡口完成后没有解锁过早巷');
+  await clickText('过早巷', '.v2-world-label');
+  await waitFor('.v2-region-layout');
+  await clickText('开始探索 · 过早巷', '.v2-btn');
+  await waitFor('.v2-node-panel');
+  await waitFor('.v2-choice');
+  await shot('16-v2-second-region');
+
+  await clickText('任务', '.v2-nav-tab');
+  await waitFor('.v2-quest-grid');
+  const claimed = await evaluate(`(() => {
+    const card = [...document.querySelectorAll('.v2-quest')].find((node) => (node.textContent || '').includes('第一场胜仗'));
+    const button = card?.querySelector('button:not(:disabled)');
+    if (!button) return false;
+    button.click();
+    return true;
+  })()`);
+  if (!claimed) console.warn('  注意：第一场胜仗任务不在可领取状态');
+  await sleep(400);
+  await shot('17-v2-quests');
+  const questStore = await evaluate(`(() => {
+    const raw = localStorage.getItem('jcm.v2.save');
+    if (!raw) return null;
+    const save = JSON.parse(raw);
+    return { claimed: Boolean(save.quests['q_first_win']?.claimed), materials: save.materials };
+  })()`);
+  if (questStore && !questStore.claimed) errors.push('任务奖励领取后没有写入存档');
+
+  await evaluate(`(() => {
+    const raw = localStorage.getItem('jcm.v2.save');
+    if (!raw) return false;
+    const save = JSON.parse(raw);
+    if (!save.collection.length) return false;
+    for (const unit of save.collection) {
+      unit.level = Math.max(3, unit.level);
+      unit.xp = 0;
+    }
+    save.tokens = Math.max(3, save.tokens);
+    localStorage.setItem('jcm.v2.save', JSON.stringify(save));
+    return true;
+  })()`);
+  await cdp.send('Page.navigate', { url: `${BASE}/?v2=1` });
+  await waitFor('.v2-app');
+  await clickText('我的队伍', '.v2-nav-tab');
+  await waitFor('.v2-party-slots');
+  await clickText('成长', '.v2-btn');
+  await waitFor('.v2-evolve-panel');
+  await shot('18-v2-evolve');
+  const evolved = await evaluate(`(() => {
+    const button = [...document.querySelectorAll('.v2-evolve-card button')].find((node) => !node.disabled);
+    if (!button) return false;
+    button.click();
+    return true;
+  })()`);
+  if (!evolved) errors.push('进化面板没有可用分支');
+  await sleep(700);
+  const evolutionStore = await evaluate(`(() => {
+    const raw = localStorage.getItem('jcm.v2.save');
+    if (!raw) return null;
+    const save = JSON.parse(raw);
+    return { evolution: save.collection[0]?.evolutionId ?? null, tokens: save.tokens, evolutions: save.stats.evolutions };
+  })()`);
+  console.log(`  进化结果：${JSON.stringify(evolutionStore)}`);
+  if (!evolutionStore?.evolution) errors.push('进化后存档没有进化 ID');
+  await shot('19-v2-evolved');
+
   console.log('· 移动端 375');
   await setViewport(375, 812, true);
   await cdp.send('Page.navigate', { url: `${BASE}/?v2=1` });
@@ -379,6 +460,18 @@ try {
   await shot('12-v2-mobile-confirm');
   const overflow = await evaluate(`({ scroll: document.documentElement.scrollWidth, inner: window.innerWidth })`);
   if (overflow.scroll > overflow.inner + 1) errors.push(`移动端横向溢出：${overflow.scroll} > ${overflow.inner}`);
+  console.log('· 移动端地图 / 任务');
+  await clickText('我的队伍', '.v2-nav-tab');
+  await waitFor('.v2-party-slots');
+  await clickText('打开江城地图', '.v2-btn');
+  await waitFor('.v2-world-mobile');
+  await waitFor('.v2-node-panel');
+  await shot('20-v2-mobile-map');
+  const mapOverflow = await evaluate(`({ scroll: document.documentElement.scrollWidth, inner: window.innerWidth })`);
+  if (mapOverflow.scroll > mapOverflow.inner + 1) errors.push(`移动端地图横向溢出：${mapOverflow.scroll} > ${mapOverflow.inner}`);
+  await clickText('任务', '.v2-nav-tab');
+  await waitFor('.v2-quest-grid');
+  await shot('21-v2-mobile-quests');
 } catch (error) {
   errors.push(String(error?.message ?? error));
   await shot('99-v2-failure').catch(() => {});
@@ -397,3 +490,5 @@ if (errors.length) {
   process.exit(1);
 }
 console.log('\n2.0 探索切片 E2E 全部通过，截图在 docs/shots-2/');
+
+

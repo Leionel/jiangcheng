@@ -62,7 +62,7 @@ export type BuildPath = 'guardian' | 'striker' | 'trickster' | 'support' | 'move
 
 /* --------------------------------- 能力 --------------------------------- */
 
-export type StatusId = 'wet' | 'vulnerable' | 'shield' | 'charge' | 'guard' | 'mark' | 'bind';
+export type StatusId = 'wet' | 'vulnerable' | 'shield' | 'charge' | 'guard' | 'mark' | 'bind' | 'heat';
 export type StatusStack = { id: StatusId; stacks: number; turns: number };
 
 export type ActiveEffect =
@@ -134,6 +134,19 @@ export type V2Creature = {
   legacyMonsterId?: string;
   record: { wins: number; losses: number };
   createdAt: number;
+  /** Batch 2：熟练度与进化 */
+  level: number;
+  xp: number;
+  evolutionId?: string;
+  evolutionHistory: string[];
+  evolutionBase?: {
+    stats: CreatureStats;
+    actives: string[];
+    equipped: string[];
+    palette: [string, string, string];
+  };
+  /** 每只造物的羁绊经验（队伍一起战斗获得） */
+  bondXp: number;
 };
 
 /* -------------------------------- 战斗 --------------------------------- */
@@ -149,6 +162,7 @@ export type BattleEvent = {
 };
 
 export type EnemyKind = 'normal' | 'elite' | 'boss';
+export type BossRule = 'storm' | 'heat' | 'lock' | 'record' | 'thunder';
 export type EnemyDef = {
   id: string;
   name: string;
@@ -158,9 +172,20 @@ export type EnemyDef = {
   def: number;
   kind: EnemyKind;
   taunt: string;
+  /** 五区 Boss 的规则机制；普通/精英不填 */
+  bossRule?: BossRule;
 };
 
-export type EnemyActionId = 'strike' | 'guard' | 'gather' | 'storm' | 'deluge';
+export type EnemyActionId =
+  | 'strike'
+  | 'guard'
+  | 'gather'
+  | 'storm'
+  | 'deluge'
+  | 'heat_wave'
+  | 'lock'
+  | 'record'
+  | 'overload';
 
 export type EnemyIntent = {
   action: EnemyActionId;
@@ -239,6 +264,12 @@ export type ExpeditionBattleState = {
   planLog: PlanRecord[];
   outcome: BattleOutcomeV2 | null;
   linkUsed: boolean;
+  /** Batch 2：队伍羁绊等级，决定高级连携是否可用 */
+  bondLevel: number;
+  /** 桥影守卫的封锁：该回合之前支援不可用 */
+  supportLockedRound: number;
+  /** 樱信档案员记录的上一个玩家技能 */
+  recordedSkill?: string;
   rewards: { materials: number; tokens: number };
   fingerprint: string;
 };
@@ -247,7 +278,7 @@ export type BattleRewards = { materials: number; tokens: number };
 
 /* -------------------------------- 区域 --------------------------------- */
 
-export type RegionId = 'river';
+export type RegionId = 'river' | 'zao' | 'bridge' | 'sakura' | 'thunder';
 export type RegionNodeType = 'event' | 'battle' | 'elite' | 'boss';
 
 export type EventChoice = {
@@ -257,6 +288,8 @@ export type EventChoice = {
   effect:
     | { kind: 'runResonance'; amount: number }
     | { kind: 'materials'; amount: number }
+    | { kind: 'tokens'; amount: number }
+    | { kind: 'bond'; amount: number }
     | { kind: 'none' };
 };
 
@@ -283,6 +316,10 @@ export type RegionDef = {
   accent: string;
   nodes: RegionNodeDef[];
   bossId: string;
+  /** Batch 3/5：解锁条件 */
+  unlockAfter?: RegionId;
+  landmark: string;
+  blurb: string;
 };
 
 export type RegionRunState = {
@@ -315,12 +352,62 @@ export type SaveV2 = {
   lockedIds: string[];
   legacyCards: LegacyCard[];
   party: { ids: string[]; activeIndex: number };
+  /** 兼容字段：始终指向 activeRegionId 对应的 run */
   run: RegionRunState | null;
+  regionRuns: Partial<Record<RegionId, RegionRunState>>;
+  activeRegionId: RegionId;
+  unlockedRegions: RegionId[];
   regionClears: number;
   materials: number;
   tokens: number;
+  bondPoints: number;
+  quests: Record<string, { claimed: boolean; progress: number }>;
+  stats: {
+    battles: number;
+    wins: number;
+    captures: number;
+    evolutions: number;
+    links: number;
+    bosses: number;
+    regionClears: number;
+    questsClaimed: number;
+    /** 每个节点的重复战斗次数，用于经验递减 */
+    nodeXpCounts: Record<string, number>;
+  };
   settings: { aiMode: 'auto' | 'demo'; reducedMotion: boolean };
   migration: { fromVersion: 1 | 0; migratedAt: number; sourceKey: string | null };
+};
+
+export type QuestDef = {
+  id: string;
+  title: string;
+  desc: string;
+  kind: 'story' | 'growth' | 'collection' | 'challenge';
+  target: number;
+  progress: (save: SaveV2) => number;
+  reward: { materials?: number; tokens?: number; xp?: number };
+  prereq?: string[];
+};
+
+export type EvolutionBranch = {
+  id: string;
+  groupId: string;
+  name: string;
+  desc: string;
+  path: BuildPath;
+  statBonus: { hp: number; atk: number; def: number; spd: number };
+  moduleId: string;
+  palette: [string, string, string];
+  visualLayers: string[];
+};
+
+export type EvolutionGroup = {
+  id: string;
+  name: string;
+  /** 用来源物品或主标签匹配；都不匹配时作为通用组 */
+  sampleIds: string[];
+  tag?: Tag;
+  branches: EvolutionBranch[];
 };
 
 /* ------------------------------ AI 合约 --------------------------------- */
@@ -351,6 +438,10 @@ export type CreatureBuildInput = {
   source: 'sample' | 'upload' | 'legacy';
   variant: number;
   createdAt?: number;
+  /** Batch 2：成长数据可选，默认 1 级 0 XP */
+  level?: number;
+  xp?: number;
+  evolutionId?: string;
 };
 
 export type VisionLite = Pick<VisionSummary, 'primaryObject' | 'category' | 'colors' | 'features' | 'confidence'>;

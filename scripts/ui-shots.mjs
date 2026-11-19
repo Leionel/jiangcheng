@@ -187,7 +187,9 @@ try {
   await shot('03-party-page', true);
 
   console.log('· map');
-  await clickText('出发 · 江风渡口', '.v2-btn');
+  await clickText('打开江城地图', '.v2-btn');
+  await waitFor('.v2-world-map');
+  await clickText('开始探索 · 江风渡口', '.v2-btn');
   await waitFor('.v2-node-panel');
   await shot('04-map-fold');
   await shot('04-map-page', true);
@@ -225,13 +227,20 @@ try {
   await shot('09-mobile-confirm', false, true);
   await clickText('召唤它', '.v2-btn');
   await waitFor('.v2-party-slots', 6000);
-  await clickText('出发 · 江风渡口', '.v2-btn');
+  await clickText('打开江城地图', '.v2-btn');
   await waitFor('.v2-node-panel');
-  await clickText('点灯', '.v2-choice');
-  await sleep(300);
-  await clickText('进入战斗', '.v2-btn');
-  await waitFor('.v2-battle');
-  await shot('10-mobile-battle');
+  const enteredBattle = await evaluate(`(() => {
+    const target = [...document.querySelectorAll('.v2-btn')].find((node) => /进入战斗|挑战 Boss/.test(node.textContent || ''));
+    if (!target) return false;
+    target.click();
+    return true;
+  })()`);
+  if (enteredBattle) {
+    await waitFor('.v2-battle');
+    await shot('10-mobile-battle');
+  } else {
+    await shot('10-mobile-map');
+  }
   console.log(`UI shots → ${OUT}`);
 } finally {
   try {
@@ -241,3 +250,5 @@ try {
   }
   await rm(PROFILE, { recursive: true, force: true }).catch(() => {});
 }
+
+

@@ -15,6 +15,7 @@
     "shots": "node scripts/e2e-shots.mjs",
     "shots:2": "node scripts/e2e-2.mjs",
     "shots:ui": "node scripts/ui-shots.mjs",
+    "art:map": "python scripts/make-map-poster.py",
     "check:ai": "node scripts/ai-check.mjs",
     "start": "node server/server.mjs"
   },
@@ -32,3 +33,4 @@
     "vitest": "^2.1.8"
   }
 }
+

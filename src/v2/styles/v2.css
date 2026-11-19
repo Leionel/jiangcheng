@@ -3045,3 +3045,452 @@
 
 
 
+
+/* ---------------------------- 江城全图（Batch 2-5） ---------------------------- */
+
+.v2-world-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.v2-world-map {
+  position: relative;
+  aspect-ratio: 1200 / 720;
+  border: 2px solid var(--ink);
+  background: #e9e5d8;
+  overflow: hidden;
+}
+
+.v2-world-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.v2-vignette {
+  transition: opacity 0.2s ease;
+}
+
+.v2-world-label {
+  --region: var(--ink-soft);
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  display: grid;
+  gap: 0;
+  justify-items: start;
+  padding: 5px 9px;
+  background: var(--paper-hi);
+  border: 1.5px solid color-mix(in srgb, var(--region) 65%, transparent);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.v2-world-label:hover {
+  transform: translate(-50%, -52%);
+  border-color: var(--region);
+}
+
+.v2-world-label[data-selected="true"] {
+  border: 2.5px solid var(--riso-red);
+  transform: translate(-50%, -52%);
+}
+
+.v2-world-label[data-state="locked"] {
+  opacity: 0.55;
+}
+
+.v2-world-label[data-state="done"] {
+  border-color: var(--riso-blue);
+}
+
+.v2-world-label-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.v2-world-label-name i {
+  width: 8px;
+  height: 8px;
+  background: var(--region);
+  flex: none;
+}
+
+.v2-world-label-meta {
+  font-size: 13px;
+  color: var(--region);
+  font-weight: 700;
+}
+
+.v2-world-label-boss {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.v2-world-label[data-selected="true"] .v2-world-label-meta {
+  color: var(--riso-red);
+}
+
+.v2-world-mobile {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .v2-world-map {
+    display: none;
+  }
+
+  .v2-world-mobile {
+    display: grid;
+    gap: 8px;
+  }
+
+  .v2-world-mobile-item {
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    padding: 10px;
+    background: var(--paper-hi);
+    border: 1.5px solid rgba(20, 33, 43, 0.28);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .v2-world-mobile-item[data-state="locked"] {
+    opacity: 0.55;
+  }
+
+  .v2-world-mobile-item[data-selected="true"] {
+    border: 2px solid var(--riso-red);
+  }
+
+  .v2-world-mobile-mark {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border: 1.5px solid var(--ink);
+    background: color-mix(in srgb, var(--region) 15%, var(--paper));
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--region);
+  }
+
+  .v2-world-mobile-item b {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 800;
+  }
+
+  .v2-world-mobile-item em {
+    display: block;
+    font-style: normal;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-world-label {
+    transition: none;
+  }
+}
+
+/* ---------------------- Batch 2-5：成长 / 区域 / 任务 / 进化 ---------------------- */
+
+.v2-party-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.v2-growth-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.v2-growth-line b {
+  color: var(--riso-red);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.v2-growth-line em {
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.v2-xp-bar {
+  flex: 1;
+  min-width: 54px;
+  height: 8px;
+  border: 1.5px solid var(--ink);
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.v2-xp-bar i {
+  display: block;
+  height: 100%;
+  background: var(--riso-red);
+  transition: width 0.3s ease;
+}
+
+.v2-region-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(270px, 0.65fr);
+  gap: var(--v2-s5);
+  align-items: start;
+}
+
+.v2-region-main {
+  display: grid;
+  gap: var(--v2-s4);
+}
+
+.v2-region-title {
+  --region: var(--ink-soft);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--v2-s4);
+  align-items: flex-start;
+  padding-left: 12px;
+  border-left: 6px solid var(--region);
+}
+
+.v2-region-title .v2-h3 {
+  font-size: 26px;
+}
+
+.v2-region-stamp {
+  flex: none;
+  padding: 4px 9px;
+  border: 2px solid var(--region);
+  color: var(--region);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 800;
+  transform: rotate(-3deg);
+  white-space: nowrap;
+}
+
+.v2-region-stamp[data-state="done"] {
+  border-color: var(--riso-blue);
+  color: var(--riso-blue);
+}
+
+.v2-region-stamp[data-state="locked"] {
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.v2-region-side {
+  display: grid;
+  gap: var(--v2-s3);
+  align-content: start;
+  border-left: 2px solid var(--ink);
+  padding-left: var(--v2-s4);
+}
+
+.v2-region-start,
+.v2-region-locked {
+  display: grid;
+  gap: var(--v2-s3);
+  align-content: start;
+}
+
+.v2-region-locked b {
+  font-family: var(--font-display);
+  font-size: 22px;
+}
+
+.v2-quest-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--v2-s3);
+}
+
+.v2-quest {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1.5px solid rgba(20, 33, 43, 0.28);
+  background: var(--paper-hi);
+}
+
+.v2-quest[data-state="claimed"] {
+  opacity: 0.62;
+}
+
+.v2-quest[data-state="complete"] {
+  border-color: var(--riso-red);
+  background: rgba(226, 64, 43, 0.035);
+}
+
+.v2-quest-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.v2-quest-kind {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.v2-quest > b {
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+
+.v2-quest > p {
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
+.v2-quest-progress {
+  height: 8px;
+  border: 1.5px solid var(--ink);
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.v2-quest-progress span {
+  display: block;
+  height: 100%;
+  background: var(--riso-red);
+}
+
+.v2-quest-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.v2-evolve-panel {
+  width: min(820px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--paper-hi);
+  border: 2px solid var(--ink);
+  padding: 20px;
+  display: grid;
+  gap: var(--v2-s4);
+}
+
+.v2-evolve-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--v2-s3);
+}
+
+.v2-evolve-card {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1.5px solid var(--ink);
+  background: var(--paper-hi);
+}
+
+.v2-evolve-card > b {
+  font-family: var(--font-display);
+  font-size: 20px;
+}
+
+.v2-evolve-card .v2-badge {
+  justify-self: start;
+}
+
+.v2-evolve-current {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+@media (max-width: 1120px) {
+  .v2-region-layout,
+  .v2-quest-grid,
+  .v2-evolve-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .v2-region-side {
+    border-left: 0;
+    border-top: 2px solid var(--ink);
+    padding-left: 0;
+    padding-top: var(--v2-s3);
+  }
+}
+
+@media (max-width: 720px) {
+  .v2-evolve-panel {
+    padding: 14px;
+  }
+
+  .v2-region-title {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .v2-region-title .v2-h3 {
+    font-size: 23px;
+  }
+}
+
+
+.v2-codex-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.v2-codex-filters .v2-pill {
+  min-height: 30px;
+  font-size: 12.5px;
+}
+
+.v2-badge[data-kind="tier"] {
+  color: var(--riso-blue);
+  border-color: var(--riso-blue);
+}
+
+/* Emil 设计工程：按钮按下反馈用 scale，而非位移；只在支持 hover 的设备上做 hover 位移 */
+.v2-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .v2-sample:hover,
+  .v2-skill:hover:not(:disabled),
+  .v2-choice:hover,
+  .v2-world-label:hover {
+    transform: none;
+  }
+}
