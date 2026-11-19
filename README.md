@@ -10,6 +10,28 @@
 
 ---
 
+## 2.0 探索切片（Batch 0 + Batch 1，2026-11-19）
+
+P1 旧版完整保留；2.0 以 `?v2=1` 进入「捕获站 → 语义确认 → 召唤定形 → 三人队伍 → 江风渡口 → 风雨电台 Boss」的探索切片。
+
+```bash
+npm run build && npm run preview
+# P1 旧版： http://localhost:8787/
+# 2.0 切片：http://localhost:8787/?v2=1
+
+npm run shots:2      # 2.0 E2E：15 张截图到 docs/shots-2/
+npm run check:ai     # 真实模型：analyze / battle-plan / analyze-object / battle-director
+```
+
+- **物品语义编译器**：五维标签 + 看见/推断/我确认三源证据 + 3 次纠正，技能与数值全部由规则编译（预算 68–75）。
+- **三人队伍 + expedition_v2**：主战/支援、换位、支援指令、共鸣、状态、连携；纯函数、可复现。
+- **AI 真实参与**：Boss/敌人每回合在合法行动中由模型选招，伤害/阶段/胜负仍由规则结算；失败自动回落并标注来源。
+- **江风渡口**：5 节点、2 个机制事件、2 个敌人原型、双阶段 Boss；区域进度/材料/信物持久化。
+- **兼容**：旧 `jcm.gallery.v1` 只读迁移不丢卡；旧版快斗、37 条 P1 测试与 10 步 E2E 保持通过。
+- 当前实施状态、偏差与 Batch 2 计划见 [`docs/JIANGCHENG_2_STATUS.md`](docs/JIANGCHENG_2_STATUS.md)。
+
+---
+
 ## 快速开始
 
 ```bash
@@ -29,8 +51,9 @@ npm run dev              # 5173，Vite 已代理 /api
 ```bash
 npm test                 # vitest：规则、边界、可复现、AI 降级、战术、战绩、平衡（37 条）
 npm run typecheck        # tsc --noEmit
-npm run check:ai         # 真实模型冒烟：/api/monsters/analyze + /api/battle/plan（无 Key 会跳过并说明）
+npm run check:ai         # 真实模型冒烟：analyze / battle-plan / analyze-object / battle-director（无 Key 会跳过并说明）
 npm run shots            # 无头 Chrome 走完整流程 + 截图到 docs/shots/
+npm run shots:2          # 2.0 探索切片 E2E + 截图到 docs/shots-2/
 ```
 
 环境：Node ≥ 18（开发用 22.22 验证），桌面 Chrome 最近版本。移动端 375px 已验证不横向溢出。

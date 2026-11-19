@@ -11,8 +11,9 @@
 | 代码量 | 约 9.5k 行（含 CSS 2.5k、测试 900+、服务端 620） |
 | 技术栈 | React 18 + Vite 5 + TypeScript + zod + vitest；服务端零依赖 Node |
 | 模型 | 武大 MaaS `https://maas.whu.edu.cn/v1` · `deepseek-v4-flash`（已实测可读图，延迟 1.2–18.4s；可用于敌方选招） |
-| 状态 | P1 完成：37 条测试全绿；10 张分步截图；AI 已真实参与战斗决策；无 git 仓库 |
+| 状态 | P1 完成；2.0 Batch 0/1 探索切片可玩（`?v2=1`）；**67 条测试全绿（v1 38 + v2 29）**；无 git 远程仓库（已建立本地基线） |
 | P1 文档 | `docs/P1-AUDIT.md`（审计）/ `docs/P1-PLAN.md`（任务清单）/ `docs/P1-RESULT.md`（实施结果） |
+| 2.0 文档 | `docs/JIANGCHENG_2_GDD.md` 等六份规划 + `docs/JIANGCHENG_2_STATUS.md`（Batch 0/1 实施状态） |
 
 ---
 

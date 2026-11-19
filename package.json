@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "shots": "node scripts/e2e-shots.mjs",
+    "shots:2": "node scripts/e2e-2.mjs",
     "check:ai": "node scripts/ai-check.mjs",
     "start": "node server/server.mjs"
   },

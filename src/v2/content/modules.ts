@@ -1,0 +1,228 @@
+import type { ActiveModule, PassiveModule, SupportCommand } from '../domain/types';
+
+/**
+ * 能力模块白名单（Batch 1 首批：14 主动 + 10 被动 + 5 支援指令 + 2 连携）。
+ * 所有数值为规则初值；AI 只能建议标签，不能增删模块或改数值。
+ */
+export const ACTIVE_MODULES: ActiveModule[] = [
+  {
+    id: 'A01',
+    name: '开伞屏障',
+    kind: 'guard',
+    power: 0,
+    cost: 2,
+    cooldown: 2,
+    tags: ['protect', 'foldable', 'rain'],
+    effect: { kind: 'shield', amount: 8, team: true },
+    text: '全队获得 8 点护盾；暴雨被挡下时会转为共鸣。',
+  },
+  {
+    id: 'A02',
+    name: '缠线牵制',
+    kind: 'control',
+    power: 8,
+    cost: 1,
+    cooldown: 2,
+    tags: ['bind', 'long', 'street_food'],
+    effect: { kind: 'control', damage: 8 },
+    text: '造成 8 伤害，并让敌方下一次行动延后（跳过）。',
+  },
+  {
+    id: 'A03',
+    name: '渡航护航',
+    kind: 'guard',
+    power: 0,
+    cost: 1,
+    cooldown: 2,
+    tags: ['carry', 'vehicle', 'river'],
+    effect: { kind: 'shield', amount: 10 },
+    text: '主战获得 10 点护盾，适合换位前铺路。',
+  },
+  {
+    id: 'A04',
+    name: '落樱标记',
+    kind: 'control',
+    power: 8,
+    cost: 1,
+    cooldown: 2,
+    tags: ['flower', 'flat', 'nature'],
+    effect: { kind: 'damage', power: 8, status: 'mark', stacks: 1 },
+    text: '造成 8 伤害并标记目标，之后它受到的伤害提高。',
+  },
+  {
+    id: 'A05',
+    name: '储流蓄能',
+    kind: 'buff',
+    power: 0,
+    cost: 0,
+    cooldown: 1,
+    tags: ['hollow', 'river', 'liquid_like'],
+    effect: { kind: 'charge', stacks: 2 },
+    text: '获得 2 层蓄流；下一次攻击每层 +6 威力。',
+  },
+  {
+    id: 'A06',
+    name: '留痕复写',
+    kind: 'heal',
+    power: 0,
+    cost: 1,
+    cooldown: 2,
+    tags: ['stationery', 'layered'],
+    effect: { kind: 'heal', amount: 8 },
+    text: '回复主战 8 HP，并记录这次行动。',
+  },
+  {
+    id: 'A07',
+    name: '余温冲刺',
+    kind: 'attack',
+    power: 18,
+    cost: 1,
+    cooldown: 1,
+    tags: ['food', 'nourish', 'street_food'],
+    effect: { kind: 'damage', power: 18 },
+    text: '稳定的一击，命中后积累 1 点共鸣。',
+  },
+  {
+    id: 'A08',
+    name: '潮信护符',
+    kind: 'guard',
+    power: 0,
+    cost: 2,
+    cooldown: 2,
+    tags: ['river', 'rigid'],
+    effect: { kind: 'shield', amount: 10, team: true },
+    text: '全队获得 10 点护盾，持续到被击破。',
+  },
+  {
+    id: 'A09',
+    name: '桥契束缚',
+    kind: 'control',
+    power: 6,
+    cost: 1,
+    cooldown: 2,
+    tags: ['bridge', 'connect'],
+    effect: { kind: 'damage', power: 6, status: 'bind', stacks: 1 },
+    text: '造成 6 伤害，并束缚目标使其下一动延后。',
+  },
+  {
+    id: 'A10',
+    name: '雷光引线',
+    kind: 'attack',
+    power: 26,
+    cost: 2,
+    cooldown: 2,
+    tags: ['illuminate', 'invention'],
+    effect: { kind: 'damage', power: 26 },
+    text: '高威力本系攻击；若目标潮湿则伤害更高。',
+  },
+  {
+    id: 'A11',
+    name: '雾中听风',
+    kind: 'buff',
+    power: 0,
+    cost: 0,
+    cooldown: 1,
+    tags: ['rain', 'flat'],
+    effect: { kind: 'resonance', amount: 1 },
+    text: '获得 1 点共鸣，并让下一次支援不消耗共鸣。',
+  },
+  {
+    id: 'A12',
+    name: '早味补给',
+    kind: 'heal',
+    power: 0,
+    cost: 1,
+    cooldown: 2,
+    tags: ['food', 'nourish'],
+    effect: { kind: 'heal', amount: 14, cleanse: 'wet' },
+    text: '回复主战 14 HP，并解除潮湿。',
+  },
+  {
+    id: 'A13',
+    name: '多面折光',
+    kind: 'guard',
+    power: 0,
+    cost: 1,
+    cooldown: 2,
+    tags: ['foldable', 'illuminate'],
+    effect: { kind: 'shield', amount: 10 },
+    text: '主战获得 10 点护盾，折光抵消一部分伤害。',
+  },
+  {
+    id: 'A14',
+    name: '共振脉冲',
+    kind: 'buff',
+    power: 0,
+    cost: 1,
+    cooldown: 2,
+    tags: ['generic'],
+    effect: { kind: 'charge', stacks: 1 },
+    text: '获得 1 层蓄力，队伍配合越好伤害越高。',
+  },
+  {
+    id: 'A15',
+    name: '伞骨突刺',
+    kind: 'attack',
+    power: 16,
+    cost: 1,
+    cooldown: 1,
+    tags: ['tool', 'protect', 'foldable', 'rigid'],
+    effect: { kind: 'damage', power: 16 },
+    text: '用骨架稳定地戳一下：伤害不高，但不依赖属性克制。',
+  },
+];
+
+export const PASSIVE_MODULES: PassiveModule[] = [
+  { id: 'P01', name: '遮挡本能', tags: ['protect'], text: '每场第一次受到的伤害减半。' },
+  { id: 'P02', name: '缠绕体质', tags: ['bind', 'long'], text: '攻击有概率附加缠绕。' },
+  { id: 'P03', name: '潮感', tags: ['river', 'rain'], text: '在水系区域攻击 +2。' },
+  { id: 'P04', name: '轻身', tags: ['flat', 'flower'], text: '每场闪避第一次单体攻击。' },
+  { id: 'P05', name: '容器', tags: ['hollow'], text: '每回合开始回复 2 HP。' },
+  { id: 'P06', name: '记录', tags: ['stationery'], text: '每场第一次被施加负面状态时获得 2 共鸣。' },
+  { id: 'P07', name: '热度积累', tags: ['food'], text: '连续使用不同技能时，伤害逐步提高。' },
+  { id: 'P08', name: '桥接', tags: ['bridge', 'connect'], text: '换位不消耗共鸣，换位后的第一次攻击 +4。' },
+  { id: 'P09', name: '反光涂层', tags: ['illuminate'], text: '受到江流伤害 -20%。' },
+  { id: 'P10', name: '回收者', tags: ['tool'], text: '战斗结束时额外获得 1 个材料。' },
+];
+
+export const SUPPORT_COMMANDS: SupportCommand[] = [
+  { id: 'SUP_BRACE', name: '撑伞援护', cost: 0, cooldown: 2, text: '给主战 8 点护盾', effect: { kind: 'shield', amount: 8 } },
+  { id: 'SUP_FOCUS', name: '蓄力指引', cost: 0, cooldown: 2, text: '给主战 2 层蓄流', effect: { kind: 'charge', stacks: 2 } },
+  { id: 'SUP_SCOUT', name: '雾中侦测', cost: 0, cooldown: 2, text: '敌方脆弱 2 回合，+1 共鸣', effect: { kind: 'scout' } },
+  { id: 'SUP_MEND', name: '早味补给', cost: 1, cooldown: 2, text: '回复主战 10 HP 并解湿', effect: { kind: 'heal', amount: 10, cleanse: 'wet' } },
+  { id: 'SUP_FERRY', name: '渡航接应', cost: 0, cooldown: 2, text: '给主战 6 护盾并 +1 共鸣', effect: { kind: 'ferry' } },
+];
+
+export type LinkDef = {
+  id: string;
+  name: string;
+  cost: number;
+  requires: string[];
+  text: string;
+};
+
+export const LINKS: LinkDef[] = [
+  {
+    id: 'LINK_SHELTER',
+    name: '渡航护盾',
+    cost: 2,
+    requires: ['guardian', 'mover'],
+    text: '全队获得 12 护盾，并清除潮湿。',
+  },
+  {
+    id: 'LINK_BIND',
+    name: '潮缠锁',
+    cost: 2,
+    requires: ['trickster'],
+    text: '造成 14 伤害，并让敌方下一次行动延后。',
+  },
+];
+
+export const ACTIVE_BY_ID = new Map(ACTIVE_MODULES.map((module) => [module.id, module]));
+export const PASSIVE_BY_ID = new Map(PASSIVE_MODULES.map((module) => [module.id, module]));
+export const SUPPORT_BY_ID = new Map(SUPPORT_COMMANDS.map((command) => [command.id, command]));
+export const LINK_BY_ID = new Map(LINKS.map((link) => [link.id, link]));
+
+export function moduleTags(moduleId: string): string[] {
+  return ACTIVE_BY_ID.get(moduleId)?.tags ?? [];
+}

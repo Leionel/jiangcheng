@@ -337,6 +337,9 @@ export default function App() {
           >
             图鉴<span className="nav-count">{gallery.length}</span>
           </button>
+          <a className="nav-tab" href="?v2=1" style={{ textDecoration: 'none' }} title="进入 2.0 探索切片">
+            2.0 试玩 ↗
+          </a>
           <span className="stamp" data-mode={modeKey}>
             <span className="stamp-dot" />
             {modeText}

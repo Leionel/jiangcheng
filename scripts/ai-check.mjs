@@ -148,9 +148,60 @@ console.log(
   `  出招：${plan.json?.plan?.skill} · 理由：${plan.json?.plan?.reason ?? '—'} · 播报：${plan.json?.plan?.taunt ?? '—'} / ${plan.latencyMs}ms`,
 );
 
+console.log('· /api/ai/analyze-object（2.0 语义标签）');
+const analyzeObject = await postJson('/api/ai/analyze-object', {
+  vision: {
+    primaryObject: '一把合起的雨伞',
+    category: 'everyday',
+    colors: ['#3B4A63', '#8FA3B8', '#D9DEE6'],
+    features: ['曲面伞面', '细长伞柄', '织物纹理', '金属伞骨'],
+    confidence: 'high',
+  },
+});
+assert(analyzeObject.status === 200, `analyze-object HTTP 200（实际 ${analyzeObject.status}）`);
+assert(analyzeObject.json?.mode === 'live_ai', 'analyze-object 返回 live_ai');
+assert(Array.isArray(analyzeObject.json?.plan?.observed), 'analyze-object 返回 observed 标签数组');
+assert(Array.isArray(analyzeObject.json?.plan?.inferred), 'analyze-object 返回 inferred 标签数组');
+const tags = [...(analyzeObject.json?.plan?.observed ?? []), ...(analyzeObject.json?.plan?.inferred ?? [])];
+assert(tags.length > 0, 'analyze-object 至少给出一个标签');
+assert(typeof analyzeObject.json?.plan?.roleHint === 'string', 'analyze-object 给出 roleHint');
+console.log(
+  `  标签：${tags.map((item) => item.tag).join(' / ')} · 倾向：${analyzeObject.json?.plan?.roleHint ?? '—'} · ${analyzeObject.latencyMs}ms`,
+);
+
+console.log('· /api/ai/battle-director（2.0 探索战导演）');
+const director = await postJson('/api/ai/battle-director', {
+  round: 2,
+  maxRounds: 8,
+  enemy: { name: '风雨电台', hpPercent: 62, phase: 1, kind: 'boss' },
+  party: [
+    { name: '伞跃跃', buildPath: 'guardian', hpPercent: 82, statuses: [] },
+    { name: '芝香面儿', buildPath: 'trickster', hpPercent: 64, statuses: ['wet'] },
+    { name: '江浪仔', buildPath: 'mover', hpPercent: 90, statuses: [] },
+  ],
+  resonance: 3,
+  actions: [
+    { id: 'strike', label: '单体攻击', estimate: 19 },
+    { id: 'storm', label: '暴雨', estimate: 9 },
+    { id: 'guard', label: '收拢防御', estimate: 0 },
+  ],
+  logTail: ['第 1 回合 · 江雾浮沫冲过来', '伞跃跃使用开伞屏障'],
+});
+assert(director.status === 200, `battle-director HTTP 200（实际 ${director.status}）`);
+assert(director.json?.mode === 'live_ai', 'battle-director 返回 live_ai');
+const legalActions = ['strike', 'storm', 'guard'];
+assert(
+  legalActions.includes(director.json?.plan?.actionId),
+  `battle-director 行动属于合法候选（${director.json?.plan?.actionId}）`,
+);
+console.log(
+  `  行动：${director.json?.plan?.actionId} · 理由：${director.json?.plan?.reason ?? '—'} · ${director.latencyMs}ms`,
+);
+
+
 if (failures.length) {
   console.error(`\n失败 ${failures.length} 项：`);
   failures.forEach((item) => console.error(' -', item));
   process.exit(1);
 }
-console.log('\n真实 AI 链路全部通过（analyze + battle-plan）。');
+console.log('\n真实 AI 链路全部通过（analyze + battle-plan + analyze-object + battle-director）。');
