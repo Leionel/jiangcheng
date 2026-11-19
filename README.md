@@ -27,6 +27,7 @@ npm run check:ai     # 真实模型：analyze / battle-plan / analyze-object / b
 - **三人队伍 + expedition_v2**：主战/支援、换位、支援指令、共鸣、状态、连携；纯函数、可复现。
 - **AI 真实参与**：Boss/敌人每回合在合法行动中由模型选招，伤害/阶段/胜负仍由规则结算；失败自动回落并标注来源。
 - **江风渡口**：5 节点、2 个机制事件、2 个敌人原型、双阶段 Boss；区域进度/材料/信物持久化。
+- **UI 设计 pass**：字号/组件统一、属性与证据彩色标签、标本标签、战斗操作台重排，以及一张可读的**虚构江城渡运观测图**（桌面 SVG / 移动端竖向路线）。详见 [`docs/JIANGCHENG_2_UI_PASS.md`](docs/JIANGCHENG_2_UI_PASS.md)。
 - **兼容**：旧 `jcm.gallery.v1` 只读迁移不丢卡；旧版快斗、37 条 P1 测试与 10 步 E2E 保持通过。
 - 当前实施状态、偏差与 Batch 2 计划见 [`docs/JIANGCHENG_2_STATUS.md`](docs/JIANGCHENG_2_STATUS.md)。
 
@@ -54,6 +55,7 @@ npm run typecheck        # tsc --noEmit
 npm run check:ai         # 真实模型冒烟：analyze / battle-plan / analyze-object / battle-director（无 Key 会跳过并说明）
 npm run shots            # 无头 Chrome 走完整流程 + 截图到 docs/shots/
 npm run shots:2          # 2.0 探索切片 E2E + 截图到 docs/shots-2/
+npm run shots:ui         # 2.0 UI 走查（桌面 1440 / 移动 390）
 ```
 
 环境：Node ≥ 18（开发用 22.22 验证），桌面 Chrome 最近版本。移动端 375px 已验证不横向溢出。

@@ -92,6 +92,25 @@ export const ALL_TAGS: Tag[] = [
   ...THEME_TAGS,
 ];
 
+export type TagDimension = 'category' | 'shape' | 'texture' | 'function' | 'theme';
+
+export const DIMENSION_LABEL: Record<TagDimension, string> = {
+  category: '类别',
+  shape: '形状',
+  texture: '材质',
+  function: '功能',
+  theme: '主题',
+};
+
+/** 给 UI 用的维度信息：不同维度的标签用不同油墨颜色，帮助扫读 */
+export function tagDimension(tag: Tag): TagDimension {
+  if ((CATEGORY_TAGS as string[]).includes(tag)) return 'category';
+  if ((SHAPE_TAGS as string[]).includes(tag)) return 'shape';
+  if ((TEXTURE_TAGS as string[]).includes(tag)) return 'texture';
+  if ((FUNCTION_TAGS as string[]).includes(tag)) return 'function';
+  return 'theme';
+}
+
 const TAG_SET = new Set<string>(ALL_TAGS);
 export function isTag(value: unknown): value is Tag {
   return typeof value === 'string' && TAG_SET.has(value);

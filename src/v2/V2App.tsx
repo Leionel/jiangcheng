@@ -15,6 +15,7 @@ import { V2_SAMPLES, sampleIdentity } from './content/samples';
 import { analyzeObject, battleDirector } from './ai/gateway';
 import { getHealth, type HealthInfo } from '../shared/ai/client';
 import { inspectImageFile } from '../features/monsters/analyze';
+import { CATEGORY_TO_ELEMENT } from '../features/monsters/elements';
 import { hashString } from '../shared/rng';
 import { MonsterSprite } from '../features/monsters/MonsterSprite';
 import { CaptureView2, type CaptureDraft } from './views/CaptureView2';
@@ -85,6 +86,7 @@ export function V2App() {
       vision: sample.vision,
       evidence: sample.evidence,
       source: 'sample',
+      element: sample.element,
       path: paths[0] ?? sample.recommendedPath,
       name: identity.name,
       flavor: identity.flavor,
@@ -108,6 +110,7 @@ export function V2App() {
           imageDataUrl: inspection.aiDataUrl,
           palette: inspection.palette,
           source: 'upload',
+          element: CATEGORY_TO_ELEMENT[inspection.vision.category],
           path: paths[0] ?? 'guardian',
           mode: preferLive ? 'live_ai' : 'local',
           note: preferLive ? '正在请求模型识别…' : '本地像素与标签规则',
@@ -173,6 +176,7 @@ export function V2App() {
       vision: draft.vision,
       evidence: draft.evidence,
       buildPath: draft.path,
+      element: draft.element,
       source: draft.source,
       ...(draft.name ? { name: draft.name } : {}),
       ...(draft.flavor ? { flavor: draft.flavor } : {}),
@@ -454,11 +458,10 @@ export function V2App() {
 
   return (
     <div className="v2-app">
-      <div className="grain" aria-hidden="true" />
       <header className="v2-topbar">
         <button type="button" className="v2-wordmark" onClick={() => setScreen('capture')}>
           <span>江城万物怪</span>
-          <small>2.0 探索切片 · JIANGCHENG ECHO CODEX</small>
+          <small>观测手册 · 探索切片 / VOL.02</small>
         </button>
         <nav className="v2-nav" aria-label="2.0 导航">
           {nav.map((item) => (
@@ -485,7 +488,8 @@ export function V2App() {
       </header>
 
       <main className="v2-shell">
-        {screen === 'capture' ? (
+        <div className="v2-screen" key={screen}>
+          {screen === 'capture' ? (
           <CaptureView2
             draft={draft}
             sampleError={captureError}
@@ -578,6 +582,7 @@ export function V2App() {
             onImport={handleImport}
           />
         ) : null}
+        </div>
       </main>
 
       <footer className="v2-footer">
@@ -591,7 +596,7 @@ export function V2App() {
       {summon ? (
         <div className="v2-summon-overlay" aria-live="polite">
           <div className="v2-summon-stage">
-            <p className="eyebrow">回响定形 · {PATH_LABEL[summon.buildPath]}</p>
+            <p className="v2-rubric">回响定形 · {PATH_LABEL[summon.buildPath]}</p>
             <div className="v2-summon-art">
               <MonsterSprite recipe={summon.visual} mood="happy" title={summon.name} />
             </div>
