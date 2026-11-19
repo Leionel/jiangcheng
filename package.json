@@ -1,0 +1,32 @@
+{
+  "name": "jiangcheng-monsters",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "江城万物怪 — 拍下现实，召唤精灵（P0 可玩原型）",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "node server/server.mjs",
+    "api": "node server/server.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "shots": "node scripts/e2e-shots.mjs",
+    "check:ai": "node scripts/ai-check.mjs",
+    "start": "node server/server.mjs"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
+  }
+}
