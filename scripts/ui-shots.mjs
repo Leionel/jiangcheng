@@ -160,13 +160,13 @@ async function disableAi() {
     localStorage.setItem('jcm.v2.save', JSON.stringify(save));
     return true;
   })()`);
-  await cdp.send('Page.navigate', { url: `${BASE}/?v2=1` });
+  await cdp.send('Page.navigate', { url: BASE });
   await waitFor('.v2-app');
 }
 
 try {
   await setViewport(1440, 900);
-  await cdp.send('Page.navigate', { url: `${BASE}/?v2=1` });
+  await cdp.send('Page.navigate', { url: BASE });
   await waitFor('.v2-app');
   await disableAi();
 
@@ -182,6 +182,8 @@ try {
 
   console.log('· summon / party');
   await clickText('召唤它', '.v2-btn');
+  await waitFor('.v2-summon-overlay', 5000);
+  await clickText('去队伍调整', '.v2-summon-overlay .v2-btn');
   await waitFor('.v2-party-slots', 6000);
   await shot('03-party-fold');
   await shot('03-party-page', true);
@@ -218,7 +220,7 @@ try {
 
   console.log('· mobile');
   await setViewport(390, 844);
-  await cdp.send('Page.navigate', { url: `${BASE}/?v2=1` });
+  await cdp.send('Page.navigate', { url: BASE });
   await waitFor('.v2-app');
   await waitFor('.v2-sample');
   await shot('08-mobile-capture');
@@ -226,6 +228,8 @@ try {
   await waitFor('.v2-confirm');
   await shot('09-mobile-confirm', false, true);
   await clickText('召唤它', '.v2-btn');
+  await waitFor('.v2-summon-overlay', 5000);
+  await clickText('去队伍调整', '.v2-summon-overlay .v2-btn');
   await waitFor('.v2-party-slots', 6000);
   await clickText('打开江城地图', '.v2-btn');
   await waitFor('.v2-node-panel');

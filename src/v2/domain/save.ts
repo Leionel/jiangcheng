@@ -9,7 +9,7 @@ import { inferTags, recommendPaths } from './tags';
 import { applyEvolution, branchById, revertEvolution } from './evolution';
 import { addBondXp, bondLevel, bondXpForBattle } from './bonds';
 import { battleXp, grantXp } from './growth';
-import { computeUnlockedRegions, createRegionRun, REGION_ORDER } from './region';
+import { advanceEventNode, applyEventChoiceDetailed, computeUnlockedRegions, createRegionRun, REGION_ORDER } from './region';
 import type {
   BuildPath,
   EnemyKind,
@@ -204,8 +204,11 @@ export function validateSave(raw: unknown): SaveV2 | null {
   if (legacyRun && !regionRuns[legacyRun.regionId]) regionRuns[legacyRun.regionId] = legacyRun;
   const activeRegionId =
     candidate.activeRegionId && REGION_ORDER.includes(candidate.activeRegionId) ? candidate.activeRegionId : legacyRun?.regionId ?? 'river';
-  const unlockedRegions = computeUnlockedRegions(regionRuns);
-  if (!unlockedRegions.includes(activeRegionId)) unlockedRegions.unshift(activeRegionId);
+  const savedUnlocked = Array.isArray(candidate.unlockedRegions)
+    ? candidate.unlockedRegions.filter((id): id is RegionId => REGION_ORDER.includes(id))
+    : [];
+  const unlockedSet = new Set<RegionId>([...computeUnlockedRegions(regionRuns), ...savedUnlocked, activeRegionId]);
+  const unlockedRegions = REGION_ORDER.filter((id) => unlockedSet.has(id));
   const statsCandidate = (candidate.stats ?? {}) as Partial<SaveV2['stats']>;
   const stats: SaveV2['stats'] = {
     ...defaultStats(),
@@ -301,6 +304,11 @@ export function persistSave(save: SaveV2): boolean {
 
 /* ------------------------------ 生命周期辅助 ------------------------------ */
 
+function mergeUnlockedRegions(existing: RegionId[], runs: Partial<Record<RegionId, RegionRunState>>): RegionId[] {
+  const unlocked = new Set<RegionId>([...existing, ...computeUnlockedRegions(runs)]);
+  return REGION_ORDER.filter((id) => unlocked.has(id));
+}
+
 export function getActiveRun(save: SaveV2): RegionRunState | null {
   return save.regionRuns[save.activeRegionId] ?? save.run;
 }
@@ -311,7 +319,7 @@ export function patchRegionRun(save: SaveV2, run: RegionRunState): SaveV2 {
     ...save,
     regionRuns,
     run: save.activeRegionId === run.regionId ? run : save.run,
-    unlockedRegions: computeUnlockedRegions(regionRuns),
+    unlockedRegions: mergeUnlockedRegions(save.unlockedRegions, regionRuns),
   };
 }
 
@@ -331,7 +339,72 @@ export function startRegionRun(save: SaveV2, regionId: RegionId, seed: string): 
     regionRuns,
     activeRegionId: regionId,
     run,
-    unlockedRegions: computeUnlockedRegions(regionRuns),
+    unlockedRegions: mergeUnlockedRegions(save.unlockedRegions, regionRuns),
+  };
+}
+
+/**
+ * 执行一次区域事件选择并同步全局资源：
+ * - 将事件产出的材料/信物写入全局 SaveV2
+ * - 将事件产出的队伍羁绊写入 SaveV2.bondPoints 与出战队伍 bondXp
+ * - 推进当前区域节点
+ */
+export function chooseEventInSave(
+  save: SaveV2,
+  eventId: string,
+  choiceId: string,
+): {
+  save: SaveV2;
+  materialsGained: number;
+  tokensGained: number;
+  bondGained: number;
+  bonusTriggered: boolean;
+} {
+  const activeRun = getActiveRun(save);
+  if (!activeRun) {
+    return { save, materialsGained: 0, tokensGained: 0, bondGained: 0, bonusTriggered: false };
+  }
+  const party = save.party.ids
+    .map((id) => save.collection.find((item) => item.id === id))
+    .filter((item): item is V2Creature => Boolean(item));
+  const detail = applyEventChoiceDetailed(activeRun, eventId, choiceId, party);
+  if (detail.run === activeRun) {
+    return { save, materialsGained: 0, tokensGained: 0, bondGained: 0, bonusTriggered: false };
+  }
+  const advanced = advanceEventNode(detail.run);
+  let nextSave = patchRegionRun(save, advanced);
+  const partyIds = new Set(save.party.ids);
+  const collection =
+    detail.bondGained > 0
+      ? nextSave.collection.map((item) => (partyIds.has(item.id) ? addBondXp(item, detail.bondGained) : item))
+      : nextSave.collection;
+  nextSave = {
+    ...nextSave,
+    collection,
+    materials: nextSave.materials + detail.materialsGained,
+    tokens: nextSave.tokens + detail.tokensGained,
+    bondPoints: Math.min(30, nextSave.bondPoints + detail.bondGained),
+  };
+  return {
+    save: nextSave,
+    materialsGained: detail.materialsGained,
+    tokensGained: detail.tokensGained,
+    bondGained: detail.bondGained,
+    bonusTriggered: detail.bonusTriggered,
+  };
+}
+
+/**
+ * 首次捕获时将新召唤的造物设为 1 号位（主战），让玩家立即带它出战。
+ * 已有队伍保留其余位置补位，不会超过 3 只上限。
+ */
+export function promoteCreatureToLead(save: SaveV2, creatureId: string): SaveV2 {
+  if (!save.collection.some((item) => item.id === creatureId)) return save;
+  const rest = save.party.ids.filter((id) => id !== creatureId);
+  const ids = [creatureId, ...rest].slice(0, 3);
+  return {
+    ...save,
+    party: { ids, activeIndex: 0 },
   };
 }
 
@@ -474,7 +547,7 @@ export function completeRegion(save: SaveV2, run: RegionRunState): SaveV2 {
     regionRuns,
     run: save.activeRegionId === run.regionId ? run : save.run,
     regionClears: Math.max(save.regionClears, Object.values(regionRuns).filter((item) => item?.completed).length),
-    unlockedRegions: computeUnlockedRegions(regionRuns),
+    unlockedRegions: mergeUnlockedRegions(save.unlockedRegions, regionRuns),
     stats: {
       ...save.stats,
       regionClears: Object.values(regionRuns).filter((item) => item?.completed).length,

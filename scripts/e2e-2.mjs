@@ -186,10 +186,11 @@ async function shot(name) {
 }
 
 try {
-  console.log('· 捕获站');
+  console.log('· 捕获站（默认根路径 /）');
   await setViewport(1440, 1000, false);
-  await cdp.send('Page.navigate', { url: `${BASE}/?v2=1` });
+  await cdp.send('Page.navigate', { url: BASE });
   await waitFor('.v2-app');
+  await waitFor('.v2-hero');
   await waitFor('.v2-sample');
   await shot('01-v2-capture');
 
@@ -209,10 +210,11 @@ try {
   })()`);
   await shot('02-v2-confirm');
 
-  console.log('· 召唤');
+  console.log('· 召唤（变身对照揭晓 + 设为主战）');
   await clickText('召唤它', '.v2-btn');
   await waitFor('.v2-summon-overlay', 5000);
   await shot('03-v2-summon');
+  await clickText('去队伍调整', '.v2-summon-overlay .v2-btn');
   await waitFor('.v2-party-slots', 6000);
   await shot('04-v2-party');
 

@@ -118,6 +118,16 @@ export function nextStepFor(save: SaveV2): NextStep {
     return { screen: 'party', label: '凑满三人队伍', detail: '从图鉴上阵一只，支援位越互补越好。' };
   }
   const active = getActiveRun(save);
+  const claimable = QUEST_DEFS.filter((quest) => questState(quest, save) === 'complete');
+  const canEvolveNow =
+    save.tokens >= 1 && save.collection.some((item) => item.level >= 3 && !item.evolutionId);
+
+  if (save.stats.battles > 0 && canEvolveNow) {
+    return { screen: 'party', label: '有造物可以进化了', detail: '队伍页点「成长」，消耗 1 个信物选一条进化分支。' };
+  }
+  if (save.stats.battles > 0 && claimable.length > 0 && (!active || active.completed || claimable.length >= 2)) {
+    return { screen: 'quests', label: `领取 ${claimable.length} 个任务奖励`, detail: '任务页有已达成的奖励，经验会直接分给当前队伍。' };
+  }
   if (active && !active.completed) {
     const region = getRegion(active.regionId);
     return {
@@ -130,7 +140,6 @@ export function nextStepFor(save: SaveV2): NextStep {
   if (nextRegion) {
     return { screen: 'map', label: `去「${getRegion(nextRegion).name}」`, detail: '点地图上的区域，开始新的五站路线。' };
   }
-  const claimable = QUEST_DEFS.filter((quest) => questState(quest, save) === 'complete');
   if (claimable.length > 0) {
     return { screen: 'quests', label: `领取 ${claimable.length} 个任务奖励`, detail: '任务页有可领取奖励；经验会直接给队伍。' };
   }

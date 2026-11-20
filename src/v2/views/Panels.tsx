@@ -4,7 +4,7 @@ import type { BuildPath, ExpeditionBattleState, RegionId, RegionRunState, SaveV2
 import type { EnemyDef, RegionNodeDef } from '../domain/types';
 import { PATH_META, TAG_LABELS, tagDimension } from '../domain/tags';
 import { ACTIVE_BY_ID, LINKS, PASSIVE_BY_ID } from '../content/modules';
-import { getEnemy, getEvent, getRegion, currentNode, nodeProgress } from '../domain/region';
+import { choiceRequirementStatus, currentNode, getEnemy, getEvent, getRegion, nodeProgress } from '../domain/region';
 import { bondLabel, bondLevel } from '../domain/bonds';
 import { QUEST_DEFS, completedQuestCount, questProgress, questState } from '../domain/quests';
 import { canEvolve } from '../domain/evolution';
@@ -365,6 +365,7 @@ export function PartyWorkshop({
 
 export function RegionMap({
   save,
+  partyCreatures,
   selectedRegionId,
   onSelectRegion,
   onChooseEvent,
@@ -376,6 +377,7 @@ export function RegionMap({
   onOpenCapture,
 }: {
   save: SaveV2;
+  partyCreatures?: V2Creature[];
   selectedRegionId: RegionId;
   onSelectRegion: (id: RegionId) => void;
   onChooseEvent: (eventId: string, choiceId: string) => void;
@@ -386,6 +388,11 @@ export function RegionMap({
   onOpenCodex: () => void;
   onOpenCapture: () => void;
 }) {
+  const activeParty =
+    partyCreatures ??
+    save.party.ids
+      .map((id) => save.collection.find((item) => item.id === id))
+      .filter((item): item is V2Creature => Boolean(item));
   const region = getRegion(selectedRegionId);
   const run = save.regionRuns[selectedRegionId] ?? null;
   const unlocked = save.unlockedRegions.includes(selectedRegionId);
@@ -399,9 +406,11 @@ export function RegionMap({
   const regionState = completed ? 'done' : run ? 'active' : unlocked ? 'ready' : 'locked';
   const activeNodeIndex = run ? Math.min(run.nodeIndex, region.nodes.length - 1) : 0;
   const [inspectingIndex, setInspectingIndex] = useState<number | null>(null);
+  const [confirmRestart, setConfirmRestart] = useState(false);
 
   useEffect(() => {
     setInspectingIndex(null);
+    setConfirmRestart(false);
   }, [selectedRegionId, run?.nodeIndex, Boolean(run), completed]);
 
   const isInspecting = inspectingIndex !== null && (completed || !run || inspectingIndex !== activeNodeIndex);
@@ -545,13 +554,38 @@ export function RegionMap({
                 <span className="v2-complete-stamp">区域完成</span>
                 <h3 className="v2-h3">{region.name}的 Boss 已经退场。</h3>
                 <p className="v2-lede">
-                  在箱子里留下材料 {run?.materials ?? 0}、信物 {run?.tokens ?? 0}。可以重新探索，或去下一区看看。
+                  本轮收获材料 {run?.materials ?? 0}、信物 {run?.tokens ?? 0}（已存入行囊）。可以重新探索刷材料，或去下一区看看。
                 </p>
-                <div className="v2-node-actions">
-                  <button type="button" className="v2-btn v2-btn-primary" onClick={() => onRestartRun(selectedRegionId)}>重新探索{region.name}</button>
-                  <button type="button" className="v2-btn" onClick={onOpenParty}>调整队伍</button>
-                  <button type="button" className="v2-btn" onClick={onOpenCodex}>打开图鉴</button>
-                </div>
+                {confirmRestart ? (
+                  <div className="v2-restart-confirm" role="alert">
+                    <p className="fineprint">
+                      重开会清空「{region.name}」当前轮次的线索与事件记录（已解锁区域与行囊材料/信物保留）。确认重开吗？
+                    </p>
+                    <div className="v2-node-actions">
+                      <button
+                        type="button"
+                        className="v2-btn v2-btn-primary"
+                        onClick={() => {
+                          setConfirmRestart(false);
+                          onRestartRun(selectedRegionId);
+                        }}
+                      >
+                        确认重开{region.name}
+                      </button>
+                      <button type="button" className="v2-btn" onClick={() => setConfirmRestart(false)}>
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="v2-node-actions">
+                    <button type="button" className="v2-btn v2-btn-primary" onClick={() => setConfirmRestart(true)}>
+                      重新探索{region.name}
+                    </button>
+                    <button type="button" className="v2-btn" onClick={onOpenParty}>调整队伍</button>
+                    <button type="button" className="v2-btn" onClick={onOpenCodex}>打开图鉴</button>
+                  </div>
+                )}
               </div>
             ) : !run || !node ? (
               <div className="v2-region-start">
@@ -574,18 +608,26 @@ export function RegionMap({
                 <p className="v2-lede">{event.text}</p>
                 <div className="v2-event-choices">
                   {event.choices.map((choice) => {
-                    const lockedChoice = Boolean(choice.requiresFlag && !(run?.flags ?? []).includes(choice.requiresFlag));
+                    const status = choiceRequirementStatus(choice, run, activeParty);
+                    const tagName = choice.bonusTag ? TAG_LABELS[choice.bonusTag] : '';
                     return (
                       <button
                         type="button"
                         className="v2-choice"
+                        data-bonus={status.bonusMatched}
+                        data-tag-gated={Boolean(choice.requiresTag)}
                         key={choice.id}
                         onClick={() => onChooseEvent(event.id, choice.id)}
-                        disabled={lockedChoice}
-                        title={lockedChoice ? `需要先留下「${FLAG_LABEL[choice.requiresFlag!] ?? '前面的线索'}」` : choice.desc}
+                        disabled={!status.available}
+                        title={!status.available ? status.lockedReason : choice.bonusDesc ?? choice.desc}
                       >
                         <b>{choice.label}</b>
-                        <span>{lockedChoice ? '还缺少前置线索' : choice.desc}</span>
+                        <span>{!status.available ? status.lockedReason : choice.desc}</span>
+                        {status.available && status.bonusMatched && choice.bonusDesc ? (
+                          <span className="v2-choice-bonus">✦ 队伍共振：{choice.bonusDesc}</span>
+                        ) : status.available && choice.bonusTag && choice.bonusDesc ? (
+                          <span className="v2-choice-hint">携带【{tagName}】造物可触发：{choice.bonusDesc}</span>
+                        ) : null}
                       </button>
                     );
                   })}
@@ -676,20 +718,43 @@ export function QuestPanel({
   aiPlanning: boolean;
   onAiRecommend: () => void;
 }) {
+  const [view, setView] = useState<'focus' | 'all'>('focus');
+  const enriched = QUEST_DEFS.map((quest) => ({
+    quest,
+    state: questState(quest, save),
+    value: questProgress(quest, save),
+  }));
+  const claimable = enriched.filter((item) => item.state === 'complete');
+  const active = enriched.filter((item) => item.state === 'active');
+  const claimed = enriched.filter((item) => item.state === 'claimed');
+  const locked = enriched.filter((item) => item.state === 'locked');
+  const focusList = [...claimable, ...active.slice(0, 6)];
+  const visible = view === 'all' ? [...claimable, ...active, ...locked, ...claimed] : focusList;
+  const hiddenCount = Math.max(0, enriched.length - focusList.length);
+
   return (
     <section className="v2-panel">
       <div className="v2-panel-head">
         <div>
           <p className="v2-rubric">任务 / 观测记录</p>
-          <h2 className="v2-h2">先做哪一件？</h2>
-          <p className="v2-lede">故事、成长、收藏、挑战四类任务。进度自动记录，奖励只能领一次。</p>
+          <h2 className="v2-h2">现在优先做哪几件？</h2>
+          <p className="v2-lede">优先展示可领取奖励与当前推进项；全部进度都会自动记录，奖励只领一次。</p>
         </div>
         <div className="v2-panel-actions">
           <span className="v2-badge" data-kind="resource">已完成 {completedQuestCount(save)} / {QUEST_DEFS.length}</span>
+          {claimable.length > 0 ? <span className="v2-badge" data-kind="ai">待领取 {claimable.length}</span> : null}
           <button type="button" className="v2-btn v2-btn-sm" onClick={onAiRecommend} disabled={aiPlanning}>
             {aiPlanning ? 'AI 正在看…' : 'AI 推荐下一步'}
           </button>
         </div>
+      </div>
+      <div className="v2-quest-tabs">
+        <button type="button" className="v2-pill" data-on={view === 'focus'} onClick={() => setView('focus')}>
+          当前焦点（{focusList.length}）
+        </button>
+        <button type="button" className="v2-pill" data-on={view === 'all'} onClick={() => setView('all')}>
+          全部任务（{QUEST_DEFS.length}）
+        </button>
       </div>
       {aiHint ? (
         <div className="v2-guidance-bar">
@@ -699,37 +764,45 @@ export function QuestPanel({
         </div>
       ) : null}
       <div className="v2-quest-grid">
-        {QUEST_DEFS.map((quest) => {
-          const state = questState(quest, save);
-          const value = questProgress(quest, save);
-          return (
-            <div className="v2-quest" data-state={state} key={quest.id}>
-              <div className="v2-quest-head">
-                <span className="v2-badge" data-kind={state === 'claimed' ? 'reserved' : state === 'complete' ? 'ai' : 'mode'}>
-                  {state === 'claimed' ? '已领取' : state === 'complete' ? '可领取' : state === 'locked' ? '未解锁' : '进行中'}
-                </span>
-                <span className="v2-quest-kind">{quest.kind === 'story' ? '故事' : quest.kind === 'growth' ? '成长' : quest.kind === 'collection' ? '收藏' : '挑战'}</span>
-              </div>
-              <b>{quest.title}</b>
-              <p>{quest.desc}</p>
-              <div className="v2-quest-progress">
-                <span style={{ width: `${Math.round((value / Math.max(1, quest.target)) * 100)}%` }} />
-              </div>
-              <div className="v2-quest-foot">
-                <span className="fineprint">
-                  {value} / {quest.target}
-                  {quest.reward.materials ? ` · 材料 ${quest.reward.materials}` : ''}
-                  {quest.reward.tokens ? ` · 信物 ${quest.reward.tokens}` : ''}
-                  {quest.reward.xp ? ` · 经验 ${quest.reward.xp}` : ''}
-                </span>
-                <button type="button" className="v2-btn v2-btn-sm" disabled={state !== 'complete'} onClick={() => onClaim(quest.id)}>
-                  {state === 'claimed' ? '已领取' : '领取'}
-                </button>
-              </div>
+        {visible.map(({ quest, state, value }) => (
+          <div className="v2-quest" data-state={state} key={quest.id}>
+            <div className="v2-quest-head">
+              <span className="v2-badge" data-kind={state === 'claimed' ? 'reserved' : state === 'complete' ? 'ai' : 'mode'}>
+                {state === 'claimed' ? '已领取' : state === 'complete' ? '可领取' : state === 'locked' ? '未解锁' : '进行中'}
+              </span>
+              <span className="v2-quest-kind">{quest.kind === 'story' ? '故事' : quest.kind === 'growth' ? '成长' : quest.kind === 'collection' ? '收藏' : '挑战'}</span>
             </div>
-          );
-        })}
+            <b>{quest.title}</b>
+            <p>{quest.desc}</p>
+            <div className="v2-quest-progress">
+              <span style={{ width: `${Math.round((value / Math.max(1, quest.target)) * 100)}%` }} />
+            </div>
+            <div className="v2-quest-foot">
+              <span className="fineprint">
+                {value} / {quest.target}
+                {quest.reward.materials ? ` · 材料 ${quest.reward.materials}` : ''}
+                {quest.reward.tokens ? ` · 信物 ${quest.reward.tokens}` : ''}
+                {quest.reward.xp ? ` · 经验 ${quest.reward.xp}` : ''}
+              </span>
+              <button
+                type="button"
+                className={state === 'complete' ? 'v2-btn v2-btn-primary v2-btn-sm' : 'v2-btn v2-btn-sm'}
+                disabled={state !== 'complete'}
+                onClick={() => onClaim(quest.id)}
+              >
+                {state === 'claimed' ? '已领取' : state === 'complete' ? '领取奖励' : '领取'}
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
+      {view === 'focus' && hiddenCount > 0 ? (
+        <div className="v2-quest-more">
+          <button type="button" className="v2-link-btn" onClick={() => setView('all')}>
+            展开其余 {hiddenCount} 项未解锁 / 已完成任务 →
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -235,12 +235,10 @@ export function BattleView2({
       <div className="v2-battle-head">
         <div className="v2-battle-meta">
           <span className="v2-badge" data-kind="round">第 {battle.round} / {battle.maxRounds} 回合</span>
-          <span className="v2-badge" data-kind="mode" title={battle.rulesetVersion}>探索规则 · {battle.maxRounds} 回合</span>
           <span className="v2-badge" data-kind="matchup" data-tone={matchupTone}>{matchupText}</span>
           <span className="v2-badge" data-kind={intent?.source === 'ai' ? 'ai' : 'rule'}>
             {intent?.source === 'ai' ? 'AI 选招' : planning ? 'AI 盘算中' : '规则意图'}
           </span>
-          <span className="v2-badge" data-kind="seed">种子 {battle.seed.slice(-5)}</span>
         </div>
         <div className="v2-battle-meta">
           <span className="v2-resonance" title="共鸣：换位 / 强技能 / 连携">
@@ -254,9 +252,12 @@ export function BattleView2({
           </button>
         </div>
       </div>
-      <p className="v2-coach" data-tone={coach.tone}>
-        {coach.text}
-      </p>
+
+      {coach.tone !== 'info' ? (
+        <p className="v2-coach" data-tone={coach.tone}>
+          {coach.text}
+        </p>
+      ) : null}
 
       <div className="v2-battle-stage">
         {roundFlash ? (
@@ -371,10 +372,13 @@ export function BattleView2({
 
       <div className="v2-battle-deck">
         <div className="v2-deck-main">
-          <span className="v2-rubric">主战行动 · {active.creature.name}</span>
+          <div className="v2-deck-title-row">
+            <span className="v2-rubric">主战行动 · {active.creature.name}</span>
+            <span className="fineprint">点击立即结算本回合{coach.tone === 'info' ? ` · ${coach.text}` : ''}</span>
+          </div>
           {readySupportName ? (
             <div className="v2-combo-ready" role="status">
-              ⚡ 已就绪合击：【{readySupportName}】— 现在点击下方任一主战行动，将在本回合一同发动！（再次点击可取消）
+              ⚡ 已挂起合击：【{readySupportName}】— 点击下方主战招式立即一同发动！（再次点击支援可取消）
             </div>
           ) : null}
           <div className="v2-skill-row">
@@ -445,7 +449,10 @@ export function BattleView2({
         </div>
 
         <div className="v2-deck-sub">
-          <span className="v2-rubric">换位 / 支援 / 连携</span>
+          <div className="v2-deck-title-row">
+            <span className="v2-rubric">可选附加 · 支援 / 连携 / 换位</span>
+            <span className="fineprint">不占回合，点完再点主战招式</span>
+          </div>
           <div className="v2-support-row">
             {swapActions.map((action) => {
               const target = battle.team[action.targetIndex];
@@ -494,7 +501,10 @@ export function BattleView2({
         </div>
 
         <aside className="v2-battle-log">
-          <span className="v2-rubric">战报 · {battle.log.length} 条</span>
+          <div className="v2-deck-title-row">
+            <span className="v2-rubric">战报 · {battle.log.length} 条</span>
+            <span className="fineprint mono" title={battle.rulesetVersion}>规则 {battle.maxRounds} 回合 · 种子 {battle.seed.slice(-5)}</span>
+          </div>
           <div className="v2-log" aria-live="polite">
             {battle.log.slice(-6).map((event, index) => (
               <div className="v2-log-line" data-kind={event.kind} key={`${event.round}-${index}-${event.kind}`}>

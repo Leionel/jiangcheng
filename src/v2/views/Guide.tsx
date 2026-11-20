@@ -11,7 +11,7 @@ const LOOP_STEPS: Array<{
   isDone: (save: SaveV2) => boolean;
 }> = [
   { key: 'capture', num: '①', label: '捕获定形', isDone: (save) => save.stats.captures > 0 },
-  { key: 'party', num: '②', label: '三人编队', isDone: (save) => save.party.ids.length >= 3 && save.stats.battles > 0 },
+  { key: 'party', num: '②', label: '三人编队', isDone: (save) => save.party.ids.length >= 3 && save.stats.captures > 0 },
   { key: 'map', num: '③', label: '五区探索', isDone: (save) => save.stats.regionClears > 0 },
   { key: 'quests', num: '④', label: '任务与进化', isDone: (save) => save.stats.evolutions > 0 && save.stats.questsClaimed > 0 },
 ];

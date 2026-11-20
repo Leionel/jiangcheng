@@ -9,12 +9,13 @@ import './styles/game.css';
 const container = document.getElementById('root');
 if (!container) throw new Error('找不到 #root 挂载点');
 
-const useV2 = new URLSearchParams(window.location.search).has('v2');
+const params = new URLSearchParams(window.location.search);
+const useV1 = params.has('v1') || params.get('version') === '1';
 
 createRoot(container).render(
   <StrictMode>
     <ErrorBoundary>
-      {useV2 ? <V2App /> : <App />}
+      {useV1 ? <App /> : <V2App />}
     </ErrorBoundary>
   </StrictMode>,
 );

@@ -216,9 +216,9 @@ async function click(selector, index = 0) {
 }
 
 try {
-  console.log('· 首页');
+  console.log('· 首页（旧版 P1 ?v1=1）');
   await setViewport(1440, 1000, false);
-  await cdp.send('Page.navigate', { url: BASE });
+  await cdp.send('Page.navigate', { url: `${BASE}/?v1=1` });
   await waitFor('.capture');
   await shot('01-home');
   const health = await evaluate(`fetch('/api/health').then((r) => r.json())`);
@@ -319,7 +319,7 @@ try {
   await shot('07-gallery');
 
   console.log('· 上传真实图片（走模型视觉）');
-  await cdp.send('Page.navigate', { url: BASE });
+  await cdp.send('Page.navigate', { url: `${BASE}/?v1=1` });
   await waitFor('.capture');
   await cdp.send('DOM.enable');
   const { root } = await cdp.send('DOM.getDocument');
@@ -349,7 +349,7 @@ try {
 
   console.log('· 移动端 375');
   await setViewport(375, 812, true);
-  await cdp.send('Page.navigate', { url: BASE });
+  await cdp.send('Page.navigate', { url: `${BASE}/?v1=1` });
   await waitFor('.capture');
   await shot('08-mobile-home');
   await click('.featured-btn');

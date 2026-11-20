@@ -285,6 +285,12 @@ export type EventChoice = {
   label: string;
   desc: string;
   requiresFlag?: string;
+  /** 可选：需要队伍中至少 1 只造物携带该物性标签，才可选择 */
+  requiresTag?: Tag;
+  /** 可选：队伍含该物性标签时触发的额外增益与文案 */
+  bonusTag?: Tag;
+  bonusDesc?: string;
+  bonusEffect?: EventChoice['effect'];
   /** 选择后写入 run.flags，作为后续事件/战斗的持久影响 */
   flags?: string[];
   effect:

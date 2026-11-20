@@ -53,6 +53,12 @@ export function validateContent(): ContentIssue[] {
   for (const event of Object.values(EVENTS)) {
     if (event.choices.length < 2) issues.push({ level: 'error', message: `${event.id} 事件选择过少` });
     for (const choice of event.choices) {
+      if (choice.requiresTag && !tagSet.has(choice.requiresTag)) {
+        issues.push({ level: 'error', message: `${event.id}/${choice.id} 引用了非法前置标签 ${choice.requiresTag}` });
+      }
+      if (choice.bonusTag && !tagSet.has(choice.bonusTag)) {
+        issues.push({ level: 'error', message: `${event.id}/${choice.id} 引用了非法共鸣标签 ${choice.bonusTag}` });
+      }
       if (choice.effect.kind === 'materials' && choice.effect.amount > 5) {
         issues.push({ level: 'warn', message: `${event.id}/${choice.id} 材料奖励偏高` });
       }

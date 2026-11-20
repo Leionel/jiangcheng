@@ -7,6 +7,7 @@ import {
   applyBattleGrowth,
   bindLinkStat,
   bondLevelOf,
+  chooseEventInSave,
   completeRegion,
   deevolveCreature,
   evolveCreature,
@@ -16,6 +17,7 @@ import {
   loadSave,
   patchRegionRun,
   persistSave,
+  promoteCreatureToLead,
   recordBattleResult,
   setActiveRegion,
   setEquipped,
@@ -23,7 +25,7 @@ import {
   toggleLock,
   awakenLegacyCard,
 } from './domain/save';
-import { applyEventChoice, advanceEventNode, completeNode, currentNode, getEnemy, getRegion, REGIONS } from './domain/region';
+import { completeNode, currentNode, getEnemy, getRegion, REGIONS } from './domain/region';
 import {
   ENEMY_ACTION_LABEL,
   applyEnemyPlan,
@@ -52,6 +54,13 @@ import './styles/v2.css';
 
 type Screen = 'capture' | 'party' | 'map' | 'battle' | 'result' | 'codex' | 'quests';
 
+type SummonReveal = {
+  creature: V2Creature;
+  originLabel: string;
+  originImage?: string;
+  isFirstCapture: boolean;
+};
+
 const ACTION_LABEL = ENEMY_ACTION_LABEL;
 
 function newSeed(prefix: string): string {
@@ -65,7 +74,8 @@ export function V2App() {
   const [draft, setDraft] = useState<CaptureDraft | null>(null);
   const [busy, setBusy] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
-  const [summon, setSummon] = useState<V2Creature | null>(null);
+  const [summon, setSummon] = useState<SummonReveal | null>(null);
+  const [showFullNav, setShowFullNav] = useState(false);
   const [battle, setBattle] = useState<ExpeditionBattleState | null>(null);
   const [support, setSupport] = useState<PlayerSupportAction | null>(null);
   const [aiNote, setAiNote] = useState('');
@@ -85,6 +95,7 @@ export function V2App() {
   const activeRun = getActiveRun(save);
   const preferLive = Boolean(health?.aiAvailable && save.settings.aiMode === 'auto');
   const evolveCreatureData = evolveId ? save.collection.find((item) => item.id === evolveId) ?? null : null;
+  const isFreshOnboarding = save.stats.captures === 0 && save.stats.battles === 0 && !activeRun && !showFullNav && screen === 'capture';
 
   const commit = useCallback((next: SaveV2) => {
     setSave(next);
@@ -206,6 +217,7 @@ export function V2App() {
 
   const summonCreature = useCallback(() => {
     if (!draft) return;
+    const isFirstCapture = save.stats.captures === 0;
     const creature = compileCreature({
       vision: draft.vision,
       evidence: draft.evidence,
@@ -217,16 +229,58 @@ export function V2App() {
       variant: hashString(`${draft.vision.primaryObject}|${draft.path}|${draft.evidence.map((item) => item.tag).join(',')}`) % 97,
       createdAt: Date.now(),
     });
-    setSummon(creature);
-    window.setTimeout(() => {
-      const next = addCreature(save, creature);
-      commit(next);
-      setSummon(null);
-      setDraft(null);
-      setScreen('party');
-      showToast(`「${creature.name}」已加入图鉴，可以去队伍里调整`);
-    }, 1500);
-  }, [draft, save, commit, showToast]);
+    let next = addCreature(save, creature);
+    if (isFirstCapture) {
+      next = promoteCreatureToLead(next, creature.id);
+    }
+    commit(next);
+    setSummon({
+      creature,
+      originLabel: draft.vision.primaryObject,
+      originImage: draft.imageDataUrl,
+      isFirstCapture,
+    });
+    setDraft(null);
+  }, [draft, save, commit]);
+
+  const startFirstBattleFromSummon = useCallback(() => {
+    const firstLead = summon?.creature;
+    let nextSave = firstLead ? promoteCreatureToLead(save, firstLead.id) : save;
+    let run = getActiveRun(nextSave);
+    if (!run || run.completed) {
+      nextSave = startRegionRun(nextSave, 'river', newSeed('river'));
+      const created = getActiveRun(nextSave)!;
+      run = {
+        ...created,
+        nodeIndex: 1,
+        log: [...created.log, `带着「${firstLead?.name ?? '新伙伴'}」直奔江风渡口巡游初战！`],
+      };
+      nextSave = patchRegionRun(nextSave, run);
+    }
+    const party = nextSave.party.ids
+      .map((id) => nextSave.collection.find((item) => item.id === id))
+      .filter((item): item is V2Creature => Boolean(item));
+    const node = currentNode(run);
+    const enemy = getEnemy(node.enemyId) ?? getEnemy('riv_mist')!;
+    const battleState = createExpeditionBattle({
+      seed: newSeed(`${run.seed}-${node.id}`),
+      team: party,
+      enemy,
+      startResonance: run.startResonance,
+      activeIndex: 0,
+      bondLevel: bondLevelOf(nextSave),
+      startShield: run.startShield,
+      bossHpDelta: run.bossHpDelta,
+    });
+    commit(nextSave);
+    resultRef.current = false;
+    setSummon(null);
+    setBattle(battleState);
+    setSupport(null);
+    setAiNote('');
+    setPlanning(false);
+    setScreen('battle');
+  }, [summon, save, commit]);
 
   /* ------------------------------ 队伍 ------------------------------ */
 
@@ -306,11 +360,17 @@ export function V2App() {
   const chooseEvent = useCallback(
     (eventId: string, choiceId: string) => {
       if (!activeRun) return;
-      const afterChoice = applyEventChoice(activeRun, eventId, choiceId);
-      const advanced = advanceEventNode(afterChoice);
-      commit(patchRegionRun(save, advanced));
+      const res = chooseEventInSave(save, eventId, choiceId);
+      if (res.save === save) return;
+      commit(res.save);
+      const notes: string[] = [];
+      if (res.materialsGained > 0) notes.push(`材料 +${res.materialsGained}`);
+      if (res.tokensGained > 0) notes.push(`信物 +${res.tokensGained}`);
+      if (res.bondGained > 0) notes.push(`队伍羁绊 +${res.bondGained}`);
+      if (res.bonusTriggered) notes.push('触发物性共鸣');
+      if (notes.length > 0) showToast(notes.join(' · '));
     },
-    [save, activeRun, commit],
+    [save, activeRun, commit, showToast],
   );
 
   const startBattle = useCallback(
@@ -712,17 +772,23 @@ export function V2App() {
           <small>观测手册 · 探索切片 / VOL.02</small>
         </button>
         <nav className="v2-nav" aria-label="2.0 导航">
-          {nav.map((item) => (
-            <button
-              type="button"
-              key={item.key}
-              className="v2-nav-tab"
-              data-active={screen === item.key}
-              onClick={item.onClick}
-            >
-              {item.label}
-            </button>
-          ))}
+          {!isFreshOnboarding
+            ? nav.map((item) => (
+                <button
+                  type="button"
+                  key={item.key}
+                  className="v2-nav-tab"
+                  data-active={screen === item.key}
+                  onClick={item.onClick}
+                >
+                  {item.label}
+                </button>
+              ))
+            : (
+                <button type="button" className="v2-link-btn" onClick={() => setShowFullNav(true)}>
+                  全部功能 ▾
+                </button>
+              )}
           <span className="v2-stamp" data-tone={preferLive ? 'red' : 'blue'} title={health?.model ?? ''}>
             {health ? (preferLive ? '实时 AI 就绪' : '规则/演示模式') : '检测中'}
           </span>
@@ -732,22 +798,24 @@ export function V2App() {
           <button type="button" className="v2-link-btn" onClick={toggleAiMode}>
             {save.settings.aiMode === 'auto' ? '切换演示模式' : '切换实时 AI'}
           </button>
-          <a className="v2-link-btn" href="./" title="回到 P1 三回合快斗">
+          <a className="v2-link-btn" href="?v1=1" title="切换到 P1 三回合快斗旧版">
             旧版快斗 ↗
           </a>
         </nav>
       </header>
 
       <main className="v2-shell">
-        <NextStepBar
-          save={save}
-          currentScreen={screen}
-          onNavigate={(target) => {
-            setSelectedRegionId(save.activeRegionId);
-            setScreen(target);
-          }}
-          onOpenGuide={() => setGuideOpen(true)}
-        />
+        {!isFreshOnboarding && screen !== 'battle' && screen !== 'result' ? (
+          <NextStepBar
+            save={save}
+            currentScreen={screen}
+            onNavigate={(target) => {
+              setSelectedRegionId(save.activeRegionId);
+              setScreen(target);
+            }}
+            onOpenGuide={() => setGuideOpen(true)}
+          />
+        ) : null}
         <div className="v2-screen" key={screen}>
           {screen === 'capture' ? (
           <CaptureView2
@@ -757,6 +825,7 @@ export function V2App() {
             preferLive={preferLive}
             aiAvailable={Boolean(health?.aiAvailable)}
             aiNote=""
+            isFirstTime={save.stats.captures === 0}
             samples={V2_SAMPLES}
             onPickSample={pickSample}
             onUpload={(file) => void upload(file)}
@@ -786,6 +855,7 @@ export function V2App() {
         {screen === 'map' ? (
           <RegionMap
             save={save}
+            partyCreatures={partyCreatures}
             selectedRegionId={selectedRegionId}
             onSelectRegion={selectRegion}
             onChooseEvent={chooseEvent}
@@ -868,21 +938,63 @@ export function V2App() {
       </footer>
 
       {summon ? (
-        <div className="v2-summon-overlay" aria-live="polite">
+        <div className="v2-summon-overlay" role="dialog" aria-modal="true" aria-label="回响显影定形" aria-live="polite">
           <div className="v2-summon-stage">
-            <p className="v2-rubric">回响定形 · {PATH_LABEL[summon.buildPath]}</p>
-            <div className="v2-summon-art">
-              <MonsterSprite recipe={summon.visual} mood="happy" title={summon.name} />
+            <p className="v2-rubric">
+              变身完成 · {PATH_LABEL[summon.creature.buildPath]}倾向 · 已入图鉴{summon.isFirstCapture ? '（已自动设为 1 号主战）' : ''}
+            </p>
+            <div className="v2-summon-morph">
+              <div className="v2-summon-origin">
+                <span>原物线索</span>
+                {summon.originImage ? <img src={summon.originImage} alt={summon.originLabel} /> : null}
+                <b>{summon.originLabel}</b>
+              </div>
+              <span className="v2-summon-arrow" aria-hidden="true">→</span>
+              <div className="v2-summon-art">
+                <MonsterSprite recipe={summon.creature.visual} mood="happy" title={summon.creature.name} />
+              </div>
             </div>
-            <h3 className="v2-h3">{summon.name}</h3>
-            <p className="v2-lede">{summon.flavor}</p>
+            <h3 className="v2-h3">{summon.creature.name}</h3>
+            <p className="v2-lede">{summon.creature.flavor}</p>
             <div className="v2-summon-stats mono">
-              <span>HP {summon.stats.hp}</span>
-              <span>ATK {summon.stats.atk}</span>
-              <span>DEF {summon.stats.def}</span>
-              <span>SPD {summon.stats.spd}</span>
+              <span>HP {summon.creature.stats.hp}</span>
+              <span>ATK {summon.creature.stats.atk}</span>
+              <span>DEF {summon.creature.stats.def}</span>
+              <span>SPD {summon.creature.stats.spd}</span>
             </div>
-            <p className="fineprint">正在写入图鉴…</p>
+            <div className="v2-summon-actions">
+              {save.stats.battles === 0 ? (
+                <button type="button" className="v2-btn v2-btn-primary v2-btn-lg" onClick={startFirstBattleFromSummon}>
+                  带「{summon.creature.name}」打第一场 ↗
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="v2-btn v2-btn-primary v2-btn-lg"
+                  onClick={() => {
+                    setSummon(null);
+                    setSelectedRegionId(save.activeRegionId);
+                    setScreen('map');
+                  }}
+                >
+                  带去江城地图探索 ↗
+                </button>
+              )}
+              <button
+                type="button"
+                className="v2-btn"
+                onClick={() => {
+                  setSummon(null);
+                  setScreen('party');
+                  showToast(`「${summon.creature.name}」已在队伍工坊里等你编排`);
+                }}
+              >
+                去队伍调整
+              </button>
+              <button type="button" className="v2-link-btn" onClick={() => setSummon(null)}>
+                留在捕获站
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

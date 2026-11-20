@@ -38,5 +38,21 @@ describe('Batch 2：v1 觉醒与指引', () => {
       activeRegionId: 'river' as const,
     };
     expect(nextStepFor(withRun).screen).toBe('map');
+
+    // 已参战且手头有信物与 Lv.3 造物时，优先引导进化
+    const canEvolveSave = {
+      ...withParty,
+      tokens: 1,
+      stats: { ...withParty.stats, battles: 2 },
+      collection: withParty.collection.map((item, idx) => (idx === 0 ? { ...item, level: 3 } : item)),
+    };
+    expect(nextStepFor(canEvolveSave).screen).toBe('party');
+
+    // 已参战且无可进化项、无进行中区域但有可领奖励时，优先引导领奖
+    const canClaimSave = {
+      ...withParty,
+      stats: { ...withParty.stats, battles: 2, wins: 1 },
+    };
+    expect(nextStepFor(canClaimSave).screen).toBe('quests');
   });
 });

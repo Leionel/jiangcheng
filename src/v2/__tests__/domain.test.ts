@@ -10,15 +10,19 @@ import {
   LEGACY_KEY,
   SAVE_KEY,
   addCreature,
+  chooseEventInSave,
+  completeRegion,
   createDefaultSave,
   exportSave,
   importSave,
   isV2Creature,
   loadSave,
   persistSave,
+  promoteCreatureToLead,
   recordBattleResult,
   setEquipped,
   setParty,
+  startRegionRun,
   toggleLock,
   validateSave,
 } from '../domain/save';
@@ -187,6 +191,47 @@ describe('区域 run', () => {
     run = completeNode(run, { materials: 2, tokens: 1 });
     expect(run.completed).toBe(true);
     expect(run.tokens).toBe(1);
+  });
+
+  it('事件奖励（材料/羁绊/物性共鸣）与重开区域不反锁已解锁区域', () => {
+    let save = createDefaultSave(1_700_000_000_000);
+    save = startRegionRun(save, 'river', 'ev-seed');
+
+    // 默认起始队不含 illuminate：物性专属选项被锁，绕过直接给全局存档加材料
+    const blockedBeacon = chooseEventInSave(save, 'ev_fog_lamp', 'beacon');
+    expect(blockedBeacon.save).toBe(save);
+
+    const pickedDark = chooseEventInSave(save, 'ev_fog_lamp', 'dark');
+    expect(pickedDark.materialsGained).toBe(2);
+    expect(pickedDark.save.materials).toBe(save.materials + 2);
+
+    // 给队伍带一只含 illuminate 物性的路灯造物：触发点灯额外护盾共鸣
+    const lamp = compileSample('street_lamp');
+    let withLamp = addCreature(createDefaultSave(1_700_000_000_000), lamp);
+    withLamp = promoteCreatureToLead(withLamp, lamp.id);
+    expect(withLamp.party.ids[0]).toBe(lamp.id);
+    expect(withLamp.party.ids).toHaveLength(3);
+    withLamp = startRegionRun(withLamp, 'river', 'lamp-seed');
+    const bonusLight = chooseEventInSave(withLamp, 'ev_fog_lamp', 'light');
+    expect(bonusLight.bonusTriggered).toBe(true);
+    expect(bonusLight.save.regionRuns.river?.startShield).toBe(6);
+
+    // 羁绊事件 kind:'bond' 真入账 save.bondPoints
+    let zaoSave = startRegionRun(save, 'zao', 'zao-seed');
+    const bondRes = chooseEventInSave(zaoSave, 'ev_zao_queue', 'help');
+    expect(bondRes.bondGained).toBe(2);
+    expect(bondRes.save.bondPoints).toBe(2);
+
+    // 通关第一区解锁 zao 后，重开 river 不得反锁 zao（且跨 validateSave 持久化保留）
+    let clearedRiver = startRegionRun(save, 'river', 'clear-seed');
+    let rRun = clearedRiver.regionRuns.river!;
+    rRun = { ...rRun, nodeIndex: 4, completed: true };
+    clearedRiver = completeRegion(clearedRiver, rRun);
+    expect(clearedRiver.unlockedRegions).toContain('zao');
+    const restarted = startRegionRun(clearedRiver, 'river', 'replay-seed');
+    expect(restarted.unlockedRegions).toContain('zao');
+    const reloaded = validateSave(JSON.parse(JSON.stringify(restarted)));
+    expect(reloaded?.unlockedRegions).toContain('zao');
   });
 });
 

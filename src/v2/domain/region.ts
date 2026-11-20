@@ -1,4 +1,5 @@
 import { hashString } from '../../shared/rng';
+import { TAG_LABELS } from './tags';
 import type {
   EnemyDef,
   EventChoice,
@@ -6,6 +7,8 @@ import type {
   RegionDef,
   RegionId,
   RegionRunState,
+  Tag,
+  V2Creature,
 } from './types';
 
 /* ------------------------------- 敌人 ------------------------------- */
@@ -176,8 +179,27 @@ export const EVENTS: Record<string, GameEvent> = {
     title: '雾中信号灯',
     text: '渡口的信号灯坏了。雾里有一串忽明忽暗的光，像是有人在对岸等你。',
     choices: [
-      { id: 'light', label: '用照明能力点灯', desc: '下一场战斗开局 +2 共鸣', effect: { kind: 'runResonance', amount: 2 }, flags: ['lamp_lit'] },
+      {
+        id: 'light',
+        label: '尝试修好并点灯',
+        desc: '下一场战斗开局 +2 共鸣',
+        bonusTag: 'illuminate',
+        bonusDesc: '队伍含「发光」物性：直接以信号强光开局，全队额外 +6 护盾',
+        bonusEffect: { kind: 'startShield', amount: 6 },
+        effect: { kind: 'runResonance', amount: 2 },
+        flags: ['lamp_lit'],
+      },
       { id: 'dark', label: '摸黑绕过去', desc: '捡到 2 份材料', effect: { kind: 'materials', amount: 2 } },
+      {
+        id: 'beacon',
+        label: '接通自带光源照射对岸',
+        desc: 'Boss 血量 -8%，并顺手捡到 1 份材料',
+        requiresTag: 'illuminate',
+        effect: { kind: 'bossHp', amount: -8 },
+        bonusTag: 'illuminate',
+        bonusEffect: { kind: 'materials', amount: 1 },
+        flags: ['lamp_lit'],
+      },
     ],
   },
   ev_ferry_repair: {
@@ -196,6 +218,16 @@ export const EVENTS: Record<string, GameEvent> = {
     choices: [
       { id: 'join', label: '挤进蒸汽里取暖', desc: '下一场战斗开局 +2 共鸣', effect: { kind: 'runResonance', amount: 2 }, flags: ['warm'] },
       { id: 'pack', label: '打包两份带走', desc: '获得 2 材料', effect: { kind: 'materials', amount: 2 } },
+      {
+        id: 'feast',
+        label: '借「饱腹」物性一起加餐',
+        desc: '队伍羁绊 +2 并回暖蓄势',
+        requiresTag: 'nourish',
+        effect: { kind: 'bond', amount: 2 },
+        bonusTag: 'nourish',
+        bonusEffect: { kind: 'runResonance', amount: 1 },
+        flags: ['warm'],
+      },
     ],
   },
   ev_zao_queue: {
@@ -212,8 +244,25 @@ export const EVENTS: Record<string, GameEvent> = {
     title: '断桥',
     text: '桥面断了一截。缺口下的江水很急，对面的灯还亮着。',
     choices: [
-      { id: 'connect', label: '用连接能力搭桥', desc: '下一场战斗开局 +3 共鸣', effect: { kind: 'runResonance', amount: 3 }, flags: ['bridge_connected'] },
+      {
+        id: 'connect',
+        label: '试着找木板搭桥',
+        desc: '下一场战斗开局 +3 共鸣',
+        bonusTag: 'carry',
+        bonusDesc: '队伍含「装载」物性：护航过桥更稳当，全队额外 +6 护盾',
+        bonusEffect: { kind: 'startShield', amount: 6 },
+        effect: { kind: 'runResonance', amount: 3 },
+        flags: ['bridge_connected'],
+      },
       { id: 'detour', label: '沿桥墩绕过去', desc: '获得 2 材料', effect: { kind: 'materials', amount: 2 } },
+      {
+        id: 'span',
+        label: '用自带「连接」能力架起通道',
+        desc: '开局 +4 共鸣，直接跨过断口',
+        requiresTag: 'connect',
+        effect: { kind: 'runResonance', amount: 4 },
+        flags: ['bridge_connected'],
+      },
     ],
   },
   ev_bridge_toolbox: {
@@ -503,33 +552,113 @@ export function choiceById(event: GameEvent, choiceId: string): EventChoice | nu
   return event.choices.find((choice) => choice.id === choiceId) ?? null;
 }
 
-/** 应用事件选择：修改 run 的开局共鸣/材料/信物/羁绊；同一事件只能做一次选择 */
-export function applyEventChoice(run: RegionRunState, eventId: string, choiceId: string): RegionRunState {
+export function partyHasTag(party: V2Creature[] | undefined, tag: Tag): boolean {
+  if (!party || party.length === 0) return false;
+  return party.some((member) => member.evidence.some((item) => item.tag === tag));
+}
+
+export function choiceRequirementStatus(
+  choice: EventChoice,
+  run: RegionRunState | null | undefined,
+  party?: V2Creature[],
+): {
+  available: boolean;
+  lockedReason?: string;
+  bonusMatched: boolean;
+} {
+  if (choice.requiresFlag && !(run?.flags ?? []).includes(choice.requiresFlag)) {
+    return { available: false, lockedReason: '还缺少前置线索', bonusMatched: false };
+  }
+  if (choice.requiresTag && !partyHasTag(party, choice.requiresTag)) {
+    return {
+      available: false,
+      lockedReason: `需队伍含【${TAG_LABELS[choice.requiresTag] ?? choice.requiresTag}】物性`,
+      bonusMatched: false,
+    };
+  }
+  const bonusMatched = Boolean(choice.bonusTag && partyHasTag(party, choice.bonusTag));
+  return { available: true, bonusMatched };
+}
+
+export type EventChoiceResult = {
+  run: RegionRunState;
+  materialsGained: number;
+  tokensGained: number;
+  bondGained: number;
+  bonusTriggered: boolean;
+};
+
+function applySingleEffect(
+  next: RegionRunState,
+  effect: EventChoice['effect'],
+  acc: { bondGained: number },
+) {
+  if (effect.kind === 'runResonance') next.startResonance += effect.amount;
+  if (effect.kind === 'materials') next.materials += effect.amount;
+  if (effect.kind === 'tokens') next.tokens += effect.amount;
+  if (effect.kind === 'bond') acc.bondGained += effect.amount;
+  if (effect.kind === 'startShield') next.startShield = Math.min(30, next.startShield + effect.amount);
+  if (effect.kind === 'bossHp') next.bossHpDelta += effect.amount;
+  if (effect.kind === 'flag') next.flags.push(effect.flag);
+}
+
+/** 应用事件选择并返回细粒度收益（材料/信物/羁绊），供全局存档入账 */
+export function applyEventChoiceDetailed(
+  run: RegionRunState,
+  eventId: string,
+  choiceId: string,
+  party?: V2Creature[],
+): EventChoiceResult {
   const event = EVENTS[eventId];
-  if (!event || run.eventChoices[eventId]) return run;
+  if (!event || run.eventChoices[eventId]) {
+    return { run, materialsGained: 0, tokensGained: 0, bondGained: 0, bonusTriggered: false };
+  }
   const choice = choiceById(event, choiceId);
-  if (!choice) return run;
-  if (choice.requiresFlag && !run.flags.includes(choice.requiresFlag)) return run;
+  if (!choice) {
+    return { run, materialsGained: 0, tokensGained: 0, bondGained: 0, bonusTriggered: false };
+  }
+  const status = choiceRequirementStatus(choice, run, party);
+  if (!status.available) {
+    return { run, materialsGained: 0, tokensGained: 0, bondGained: 0, bonusTriggered: false };
+  }
   const next: RegionRunState = {
     ...run,
     eventChoices: { ...run.eventChoices, [eventId]: choiceId },
     startResonance: run.startResonance,
     startShield: run.startShield,
     bossHpDelta: run.bossHpDelta,
-    flags: [...run.flags, ...(choice.flags ?? [])].filter((flag, index, list) => list.indexOf(flag) === index),
+    flags: [...run.flags, ...(choice.flags ?? [])],
     materials: run.materials,
     tokens: run.tokens,
     log: [...run.log],
   };
-  if (choice.effect.kind === 'runResonance') next.startResonance += choice.effect.amount;
-  if (choice.effect.kind === 'materials') next.materials += choice.effect.amount;
-  if (choice.effect.kind === 'tokens') next.tokens += choice.effect.amount;
-  if (choice.effect.kind === 'startShield') next.startShield = Math.min(30, next.startShield + choice.effect.amount);
-  if (choice.effect.kind === 'bossHp') next.bossHpDelta += choice.effect.amount;
-  if (choice.effect.kind === 'flag') next.flags.push(choice.effect.flag);
+  const acc = { bondGained: 0 };
+  applySingleEffect(next, choice.effect, acc);
+  const bonusTriggered = Boolean(status.bonusMatched && choice.bonusEffect);
+  if (bonusTriggered && choice.bonusEffect) {
+    applySingleEffect(next, choice.bonusEffect, acc);
+  }
   next.flags = [...new Set(next.flags)];
-  next.log.push(`事件「${event.title}」：${choice.label}`);
-  return next;
+  const bonusNote = bonusTriggered && choice.bonusTag ? `（触发「${TAG_LABELS[choice.bonusTag]}」共鸣）` : '';
+  const bondNote = acc.bondGained > 0 ? ` · 队伍羁绊 +${acc.bondGained}` : '';
+  next.log.push(`事件「${event.title}」：${choice.label}${bonusNote}${bondNote}`);
+  return {
+    run: next,
+    materialsGained: next.materials - run.materials,
+    tokensGained: next.tokens - run.tokens,
+    bondGained: acc.bondGained,
+    bonusTriggered,
+  };
+}
+
+/** 应用事件选择：修改 run 的开局共鸣/材料/信物；同一事件只能做一次选择 */
+export function applyEventChoice(
+  run: RegionRunState,
+  eventId: string,
+  choiceId: string,
+  party?: V2Creature[],
+): RegionRunState {
+  return applyEventChoiceDetailed(run, eventId, choiceId, party).run;
 }
 
 export function advanceEventNode(run: RegionRunState): RegionRunState {

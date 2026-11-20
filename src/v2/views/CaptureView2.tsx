@@ -56,6 +56,8 @@ const EDITABLE_TAGS: Tag[] = [
   'textile',
 ];
 
+const HERO_FEATURE_IDS = ['reganmian', 'yusan', 'yinghua', 'lundu'] as const;
+
 export function CaptureView2({
   draft,
   sampleError,
@@ -63,6 +65,7 @@ export function CaptureView2({
   preferLive,
   aiAvailable,
   aiNote,
+  isFirstTime = false,
   onPickSample,
   onUpload,
   onToggleLive,
@@ -80,6 +83,7 @@ export function CaptureView2({
   preferLive: boolean;
   aiAvailable: boolean;
   aiNote: string;
+  isFirstTime?: boolean;
   onPickSample: (sample: V2Sample) => void;
   onUpload: (file: File) => void;
   onToggleLive: () => void;
@@ -94,6 +98,32 @@ export function CaptureView2({
   const fileRef = useRef<HTMLInputElement>(null);
   const confirmRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [heroIdx, setHeroIdx] = useState(0);
+
+  const heroSamples = useMemo(
+    () =>
+      HERO_FEATURE_IDS.map((id) => samples.find((item) => item.id === id)).filter((item): item is V2Sample =>
+        Boolean(item),
+      ),
+    [samples],
+  );
+  const featuredSample = heroSamples[heroIdx % Math.max(1, heroSamples.length)] ?? samples[0];
+  const featuredPreview = useMemo(
+    () =>
+      featuredSample
+        ? previewBuild(featuredSample.vision, featuredSample.evidence, featuredSample.recommendedPath)
+        : null,
+    [featuredSample],
+  );
+
+  useEffect(() => {
+    if (draft || heroSamples.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setHeroIdx((value) => (value + 1) % heroSamples.length);
+    }, 3600);
+    return () => window.clearInterval(timer);
+  }, [draft, heroSamples.length]);
+
   useEffect(() => {
     if (!draft) return;
     if (!window.matchMedia('(max-width: 900px)').matches) return;
@@ -152,21 +182,29 @@ export function CaptureView2({
     >
       <div className="v2-capture-head">
         <div>
-          <h2 className="v2-h2">拍下一件物品，先看见它的“物性”</h2>
+          <p className="v2-rubric">{isFirstTime ? '物品召唤 · 10 秒变怪' : '捕获站 · 物性显影'}</p>
+          <h2 className="v2-h2">拍下身边物品，变成独一无二的江城怪</h2>
           <p className="v2-lede">
-            模型只负责看和描述；你确认的标签会真的改变技能与打法。选择成长倾向后即可召唤。
+            热干面、雨伞、水杯或书桌上的小物件都能变成会出招的伙伴，带它走过江城五个区。
           </p>
         </div>
         <div className="v2-capture-modes">
+          <button type="button" className="v2-btn v2-btn-primary" onClick={() => fileRef.current?.click()}>
+            拍照 / 上传物品
+          </button>
+          {featuredSample ? (
+            <button type="button" className="v2-btn" onClick={() => onPickSample(featuredSample)}>
+              先试玩「{featuredSample.label}」
+            </button>
+          ) : null}
           <button type="button" className="v2-pill" data-on={preferLive} onClick={onToggleLive} disabled={!aiAvailable}>
-            {preferLive ? '实时 AI 识别' : '本地识别'}
+            {preferLive ? '实时 AI 开' : '本地识别'}
           </button>
-          <button type="button" className="v2-pill" onClick={() => fileRef.current?.click()}>
-            上传照片
-          </button>
-          <button type="button" className="v2-pill v2-pill-ghost" onClick={onOpenCodex}>
-            图鉴
-          </button>
+          {!isFirstTime ? (
+            <button type="button" className="v2-pill v2-pill-ghost" onClick={onOpenCodex}>
+              图鉴
+            </button>
+          ) : null}
           <input
             ref={fileRef}
             type="file"
@@ -187,86 +225,179 @@ export function CaptureView2({
         </p>
       ) : null}
 
-      <div className="v2-capture-grid">
-        <div className="v2-sample-drawer">
-          <div className="v2-drawer-head">
-            <span>样本抽屉</span>
-            <span className="v2-count">{samples.length} 件</span>
+      {!draft && featuredSample && featuredPreview ? (
+        <div className="v2-capture-landing">
+          <div className="v2-hero">
+            <div className="v2-hero-morph">
+              <div className="v2-hero-item">
+                <span className="v2-rubric">日常原物</span>
+                <div className="v2-hero-item-card">
+                  <b>{featuredSample.label}</b>
+                  <p>{featuredSample.hint}</p>
+                  <div className="v2-hero-item-tags">
+                    {featuredSample.evidence.slice(0, 3).map((ev) => (
+                      <span className="v2-mini-tag" key={ev.tag}>{TAG_LABELS[ev.tag]}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="v2-hero-arrow" aria-hidden="true">
+                <span>显影变形</span>
+                <b>→</b>
+              </div>
+              <div className="v2-hero-creature">
+                <div className="v2-hero-sprite">
+                  <MonsterSprite recipe={featuredSample.thumb} mood="happy" title={featuredPreview.name} />
+                </div>
+                <div className="v2-hero-creature-info">
+                  <div className="v2-specimen-badges">
+                    <span
+                      className="v2-badge"
+                      data-kind="element"
+                      style={{ '--badge': ELEMENTS[featuredSample.element].color } as CSSProperties}
+                    >
+                      <i />
+                      {ELEMENTS[featuredSample.element].name}属性
+                    </span>
+                    <span
+                      className="v2-badge"
+                      data-kind="path"
+                      style={{ '--badge': PATH_META[featuredSample.recommendedPath].color } as CSSProperties}
+                    >
+                      {PATH_META[featuredSample.recommendedPath].name}
+                    </span>
+                  </div>
+                  <h3>{featuredPreview.name}</h3>
+                  <p>{featuredPreview.flavor}</p>
+                  <div className="v2-hero-cta-row">
+                    <button
+                      type="button"
+                      className="v2-btn v2-btn-primary"
+                      onClick={() => onPickSample(featuredSample)}
+                    >
+                      用它召唤「{featuredPreview.name}」↗
+                    </button>
+                    <button
+                      type="button"
+                      className="v2-link-btn"
+                      onClick={() => setHeroIdx((value) => (value + 1) % Math.max(1, heroSamples.length))}
+                    >
+                      换一个看看 ({(heroIdx % Math.max(1, heroSamples.length)) + 1}/{heroSamples.length})
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <details className="v2-rules-fold">
+              <summary>为什么“物品形态”会决定招式？（展开三步原理）</summary>
+              <ol className="v2-steps">
+                <li>
+                  <b>看见物性</b>
+                  <span>模型只描述画面里看得见的形态、材质与用途，不做身份与地点推断。</span>
+                </li>
+                <li>
+                  <b>确认改变能力</b>
+                  <span>点击确认物性标签后，规则引擎会把它转译成真实招式与数值，不只是文案。</span>
+                </li>
+                <li>
+                  <b>定形即出战</b>
+                  <span>召唤后会直接设为当前 1 号主战，立刻就能带进江城首战。</span>
+                </li>
+              </ol>
+            </details>
           </div>
-          <div className="v2-sample-grid">
-            {samples.map((sample) => {
-              const elementMeta = ELEMENTS[sample.element];
-              const pathMeta = PATH_META[sample.recommendedPath];
-              return (
-                <button
-                  type="button"
-                  className="v2-sample"
-                  key={sample.id}
-                  data-active={draft?.vision.primaryObject === sample.vision.primaryObject}
-                  onClick={() => onPickSample(sample)}
-                >
-                  <span className="v2-sample-art">
-                    <span className="v2-sample-glyph" aria-hidden="true">{sample.label.slice(0, 1)}</span>
-                    <MonsterSprite recipe={sample.thumb} title={sample.label} />
-                  </span>
-                  <span className="v2-sample-main">
-                    <b>{sample.label}</b>
-                    <span className="v2-sample-hint">{sample.hint}</span>
-                    <span className="v2-sample-badges">
-                      <span className="v2-badge" data-kind="element" style={{ '--badge': elementMeta.color } as CSSProperties}>
-                        <i />
-                        {elementMeta.name}属性
-                      </span>
-                      <span className="v2-badge" data-kind="path" style={{ '--badge': pathMeta.color } as CSSProperties}>
-                        {pathMeta.name}倾向
+
+          <div className="v2-sample-drawer">
+            <div className="v2-drawer-head">
+              <span>快速选一件日常小物</span>
+              <span className="v2-count">{samples.length} 件样本</span>
+            </div>
+            <div className="v2-sample-grid">
+              {samples.map((sample) => {
+                const elementMeta = ELEMENTS[sample.element];
+                const pathMeta = PATH_META[sample.recommendedPath];
+                return (
+                  <button
+                    type="button"
+                    className="v2-sample"
+                    key={sample.id}
+                    onClick={() => onPickSample(sample)}
+                  >
+                    <span className="v2-sample-art">
+                      <span className="v2-sample-glyph" aria-hidden="true">{sample.label.slice(0, 1)}</span>
+                      <MonsterSprite recipe={sample.thumb} title={sample.label} />
+                    </span>
+                    <span className="v2-sample-main">
+                      <b>{sample.label}</b>
+                      <span className="v2-sample-hint">{sample.hint}</span>
+                      <span className="v2-sample-badges">
+                        <span className="v2-badge" data-kind="element" style={{ '--badge': elementMeta.color } as CSSProperties}>
+                          <i />
+                          {elementMeta.name}属性
+                        </span>
+                        <span className="v2-badge" data-kind="path" style={{ '--badge': pathMeta.color } as CSSProperties}>
+                          {pathMeta.name}倾向
+                        </span>
                       </span>
                     </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          {sampleError ? <p className="v2-error">{sampleError}</p> : null}
-          <p className="fineprint">
-            默认只在浏览器里读像素；开启实时 AI 时，压缩图会发给模型用于标签识别，不保存照片、不记录位置。
-          </p>
-        </div>
-
-        {!draft || !preview ? (
-          <div className="v2-empty-note">
-            <h3 className="v2-h3">先看物性，再定形。</h3>
-            <ol className="v2-steps">
-              <li>
-                <b>看见</b>
-                <span>模型只描述画面里看得见的形态、材质与用途，不做身份与地点推断。</span>
-              </li>
-              <li>
-                <b>确认</b>
-                <span>点击证据标签确认“它真的能遮挡 / 能承载”。确认会改变能力，而不只是文案。</span>
-              </li>
-              <li>
-                <b>定形</b>
-                <span>选择守护、强攻、诡计、支援或机动，召唤演出会把它落成一张可出战的卡。</span>
-              </li>
-            </ol>
-            <div className="v2-empty-legend">
-              <span className="v2-badge" data-kind="element"><i style={{ background: 'var(--riso-blue)' }} />属性</span>
-              <span className="v2-badge" data-kind="path" style={{ '--badge': 'var(--riso-red)' } as CSSProperties}>成长倾向</span>
-              <span className="v2-badge" data-kind="tag">证据标签</span>
-              <span className="fineprint">样本 8 件；也可以上传你身边的物品。</span>
+                  </button>
+                );
+              })}
             </div>
+            {sampleError ? <p className="v2-error">{sampleError}</p> : null}
+            <p className="fineprint">
+              默认只在浏览器里读像素；开启实时 AI 时，压缩图会发给模型用于标签识别，不保存照片、不记录位置。
+            </p>
           </div>
-        ) : (
+        </div>
+      ) : draft && preview ? (
+        <div className="v2-capture-grid">
+          <div className="v2-sample-drawer">
+            <div className="v2-drawer-head">
+              <span>样本抽屉</span>
+              <span className="v2-count">{samples.length} 件</span>
+            </div>
+            <div className="v2-sample-grid">
+              {samples.map((sample) => {
+                const elementMeta = ELEMENTS[sample.element];
+                const pathMeta = PATH_META[sample.recommendedPath];
+                return (
+                  <button
+                    type="button"
+                    className="v2-sample"
+                    key={sample.id}
+                    data-active={draft?.vision.primaryObject === sample.vision.primaryObject}
+                    onClick={() => onPickSample(sample)}
+                  >
+                    <span className="v2-sample-art">
+                      <span className="v2-sample-glyph" aria-hidden="true">{sample.label.slice(0, 1)}</span>
+                      <MonsterSprite recipe={sample.thumb} title={sample.label} />
+                    </span>
+                    <span className="v2-sample-main">
+                      <b>{sample.label}</b>
+                      <span className="v2-sample-hint">{sample.hint}</span>
+                      <span className="v2-sample-badges">
+                        <span className="v2-badge" data-kind="element" style={{ '--badge': elementMeta.color } as CSSProperties}>
+                          <i />
+                          {elementMeta.name}属性
+                        </span>
+                        <span className="v2-badge" data-kind="path" style={{ '--badge': pathMeta.color } as CSSProperties}>
+                          {pathMeta.name}倾向
+                        </span>
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {sampleError ? <p className="v2-error">{sampleError}</p> : null}
+          </div>
+
           <div className="v2-confirm" ref={confirmRef}>
             <div className="v2-confirm-top">
               <div>
-                <p className="v2-rubric">
-                  第一步 · 核实物性证据（已确认 {confirmedCount} 项，还可调整 {3 - draft.corrections} 次）
-                </p>
-                <h3 className="v2-h3">{draft.vision.primaryObject}</h3>
-                <p className="fineprint v2-step-hint">
-                  点击标签切换为「我确认」，带红框的确认标签会直接赋予回响灵对应的专属招式。
-                </p>
+                <p className="v2-rubric">变身预览 · 即将召唤</p>
+                <h3 className="v2-h3">{draft.vision.primaryObject} → {draft.name || preview.name}</h3>
                 <div className="v2-confirm-badges">
                   {elementMeta ? (
                     <span className="v2-badge" data-kind="element" style={{ '--badge': elementMeta.color } as CSSProperties}>
@@ -288,6 +419,40 @@ export function CaptureView2({
               </button>
             </div>
 
+            <div className="v2-confirm-hero">
+              {draft.imageDataUrl ? (
+                <div className="v2-confirm-photo">
+                  <img src={draft.imageDataUrl} alt={draft.vision.primaryObject} />
+                  <span>原图参照</span>
+                </div>
+              ) : null}
+              <div className="v2-preview-figure">
+                <div className="v2-preview-sprite">
+                  <MonsterSprite
+                    recipe={preview.visual}
+                    mood="happy"
+                    title={draft.name || preview.name}
+                  />
+                </div>
+                <div className="v2-preview-identity">
+                  <b>{draft.name || preview.name}</b>
+                  <p className="v2-preview-flavor">{draft.flavor || preview.flavor}</p>
+                </div>
+              </div>
+              <div className="v2-confirm-hero-cta">
+                <button type="button" className="v2-btn v2-btn-primary v2-btn-lg" onClick={onSummon} disabled={busy}>
+                  {busy ? '正在定形…' : '召唤它'}
+                </button>
+                <span className="fineprint">也可在下方点选物性或切换倾向微调能力</span>
+              </div>
+            </div>
+
+            <div className="v2-step-head">
+              <span className="v2-rubric">
+                第一步 · 点选确认物性（已确认 {confirmedCount} 项，还可调 {3 - draft.corrections} 次）
+              </span>
+              <span className="fineprint">点击标签切换「我确认」，它会真的改变下方招式</span>
+            </div>
             <div className="v2-evidence-row">
               {draft.evidence.map((item) => (
                 <button
@@ -305,22 +470,24 @@ export function CaptureView2({
                 </button>
               ))}
             </div>
-            <div className="v2-evidence-tools">
-              <span>补充或纠正标签（还剩 {3 - draft.corrections} 次）</span>
-              <div className="v2-add-tags">
-                {availableTags.map((tag) => (
-                  <button
-                    type="button"
-                    className="v2-tag-add"
-                    key={tag}
-                    onClick={() => onAddEvidence(tag)}
-                    disabled={draft.corrections >= 3}
-                  >
-                    + {TAG_LABELS[tag]}
-                  </button>
-                ))}
+            <details className="v2-rules-fold">
+              <summary>补充或纠正其他物性标签（还剩 {3 - draft.corrections} 次）</summary>
+              <div className="v2-evidence-tools">
+                <div className="v2-add-tags">
+                  {availableTags.map((tag) => (
+                    <button
+                      type="button"
+                      className="v2-tag-add"
+                      key={tag}
+                      onClick={() => onAddEvidence(tag)}
+                      disabled={draft.corrections >= 3}
+                    >
+                      + {TAG_LABELS[tag]}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            </details>
             {because.length > 0 ? (
               <div className="v2-because">
                 <span className="v2-rubric">你确认的物性正在改变它</span>
@@ -337,7 +504,7 @@ export function CaptureView2({
             <div className="v2-path-block">
               <div className="v2-step-head">
                 <span className="v2-rubric">第二步 · 选择成长倾向</span>
-                <span className="fineprint">同一物品选择不同倾向，会改变四维底盘与支援指令。</span>
+                <span className="fineprint">切换倾向会重塑四维与支援指令</span>
               </div>
               <div className="v2-path-row">
                 {paths.map((path) => (
@@ -360,22 +527,9 @@ export function CaptureView2({
             </div>
 
             <div className="v2-preview-section">
-              <span className="v2-rubric">第三步 · 显影预览与召唤</span>
+              <span className="v2-rubric">能力详情 · 数值与招式</span>
               <div className="v2-preview">
                 <div className="v2-preview-left">
-                  <div className="v2-preview-figure">
-                    <div className="v2-preview-sprite">
-                      <MonsterSprite
-                        recipe={preview.visual}
-                        mood="happy"
-                        title={draft.name || preview.name}
-                      />
-                    </div>
-                    <div className="v2-preview-identity">
-                      <b>{draft.name || preview.name}</b>
-                      <p className="v2-preview-flavor">{draft.flavor || preview.flavor}</p>
-                    </div>
-                  </div>
                   <div className="v2-preview-stats">
                     <div className="v2-budget">
                       <span>数值预算</span>
@@ -425,12 +579,12 @@ export function CaptureView2({
               <button type="button" className="v2-btn v2-btn-primary v2-btn-lg" onClick={onSummon} disabled={busy}>
                 {busy ? '正在定形…' : '召唤它'}
               </button>
-              <span className="fineprint">定形后自动加入图鉴；队伍可在「我的队伍」调整。</span>
+              <span className="fineprint">定形后可直接带着它进第一战，或去「我的队伍」编排阵容。</span>
             </div>
             {aiNote ? <p className="v2-ai-note">{aiNote}</p> : null}
           </div>
-        )}
-      </div>
+        </div>
+      ) : null}
     </section>
   );
 }
