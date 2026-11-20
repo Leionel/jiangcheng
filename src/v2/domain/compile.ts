@@ -185,7 +185,7 @@ export function compileCreature(input: CreatureBuildInput): V2Creature {
   };
 }
 
-/** 供 UI 展示：某路径的首批能力与预算 */
+/** 供 UI 展示：某路径的首批能力、外观与预算 */
 export function previewBuild(
   vision: CreatureBuildInput['vision'],
   evidence: FeatureEvidence[],
@@ -193,6 +193,8 @@ export function previewBuild(
 ): {
   path: BuildPath;
   name: string;
+  flavor: string;
+  visual: VisualRecipeV2;
   stats: CreatureStats;
   actives: Array<{ id: string; name: string; text: string; cost: number; power: number }>;
   passive: { id: string; name: string; text: string };
@@ -209,6 +211,8 @@ export function previewBuild(
   return {
     path,
     name: creature.name,
+    flavor: creature.flavor,
+    visual: creature.visual,
     stats: creature.stats,
     actives: creature.actives.map((moduleId) => {
       const module = ACTIVE_BY_ID.get(moduleId)!;

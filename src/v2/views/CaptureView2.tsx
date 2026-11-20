@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { Element, VisionSummary } from '../../shared/types';
 import type { BuildPath, FeatureEvidence, Tag } from '../domain/types';
-import { previewBuild } from '../domain/compile';
+import { STAT_RANGES, previewBuild } from '../domain/compile';
 import { DIMENSION_LABEL, PATH_META, TAG_LABELS, evidenceLabel, recommendPaths, tagDimension } from '../domain/tags';
 import { ACTIVE_BY_ID, PASSIVE_BY_ID } from '../content/modules';
 import { ELEMENTS } from '../../features/monsters/elements';
+import { MonsterSprite } from '../../features/monsters/MonsterSprite';
 import type { V2Sample } from '../content/samples';
 
 export type CaptureDraft = {
@@ -92,6 +93,7 @@ export function CaptureView2({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const confirmRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
   useEffect(() => {
     if (!draft) return;
     if (!window.matchMedia('(max-width: 900px)').matches) return;
@@ -114,6 +116,7 @@ export function CaptureView2({
     return EDITABLE_TAGS.filter((tag) => !existing.has(tag)).slice(0, 12);
   }, [draft]);
   const elementMeta = draft ? ELEMENTS[draft.element] : null;
+  const confirmedCount = draft ? draft.evidence.filter((item) => item.source === 'user_confirmed').length : 0;
   const because = useMemo(() => {
     if (!draft || !preview) return [];
     const confirmed = draft.evidence.filter((item) => item.source === 'user_confirmed').map((item) => item.tag);
@@ -132,7 +135,21 @@ export function CaptureView2({
   }, [draft, preview]);
 
   return (
-    <section className="v2-capture">
+    <section
+      className="v2-capture"
+      data-dragging={dragging}
+      onDragOver={(event) => {
+        event.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={(event) => {
+        event.preventDefault();
+        setDragging(false);
+        const file = event.dataTransfer.files?.[0];
+        if (file) onUpload(file);
+      }}
+    >
       <div className="v2-capture-head">
         <div>
           <h2 className="v2-h2">拍下一件物品，先看见它的“物性”</h2>
@@ -164,6 +181,12 @@ export function CaptureView2({
         </div>
       </div>
 
+      {dragging ? (
+        <p className="v2-drop-hint" role="status">
+          松手即可读取这张照片（仅在本机处理像素，开启实时 AI 时用于物体识别）
+        </p>
+      ) : null}
+
       <div className="v2-capture-grid">
         <div className="v2-sample-drawer">
           <div className="v2-drawer-head">
@@ -183,7 +206,8 @@ export function CaptureView2({
                   onClick={() => onPickSample(sample)}
                 >
                   <span className="v2-sample-art">
-                    <span className="v2-sample-glyph">{sample.label.slice(0, 1)}</span>
+                    <span className="v2-sample-glyph" aria-hidden="true">{sample.label.slice(0, 1)}</span>
+                    <MonsterSprite recipe={sample.thumb} title={sample.label} />
                   </span>
                   <span className="v2-sample-main">
                     <b>{sample.label}</b>
@@ -236,8 +260,13 @@ export function CaptureView2({
           <div className="v2-confirm" ref={confirmRef}>
             <div className="v2-confirm-top">
               <div>
-                <p className="v2-rubric">可见证据 · 点击标签确认</p>
+                <p className="v2-rubric">
+                  第一步 · 核实物性证据（已确认 {confirmedCount} 项，还可调整 {3 - draft.corrections} 次）
+                </p>
                 <h3 className="v2-h3">{draft.vision.primaryObject}</h3>
+                <p className="fineprint v2-step-hint">
+                  点击标签切换为「我确认」，带红框的确认标签会直接赋予回响灵对应的专属招式。
+                </p>
                 <div className="v2-confirm-badges">
                   {elementMeta ? (
                     <span className="v2-badge" data-kind="element" style={{ '--badge': elementMeta.color } as CSSProperties}>
@@ -306,7 +335,10 @@ export function CaptureView2({
             ) : null}
 
             <div className="v2-path-block">
-              <span className="v2-rubric">选择成长倾向</span>
+              <div className="v2-step-head">
+                <span className="v2-rubric">第二步 · 选择成长倾向</span>
+                <span className="fineprint">同一物品选择不同倾向，会改变四维底盘与支援指令。</span>
+              </div>
               <div className="v2-path-row">
                 {paths.map((path) => (
                   <button
@@ -327,34 +359,64 @@ export function CaptureView2({
               </div>
             </div>
 
-            <div className="v2-preview">
-              <div className="v2-preview-stats">
-                <div className="v2-budget">
-                  <span>数值预算</span>
-                  <b>{preview.budget} / 75</b>
-                </div>
-                <div className="v2-stat-line"><span>HP</span><b>{preview.stats.hp}</b></div>
-                <div className="v2-stat-line"><span>ATK</span><b>{preview.stats.atk}</b></div>
-                <div className="v2-stat-line"><span>DEF</span><b>{preview.stats.def}</b></div>
-                <div className="v2-stat-line"><span>SPD</span><b>{preview.stats.spd}</b></div>
-              </div>
-              <div className="v2-preview-skills">
-                <div className="v2-preview-card" data-kind="passive">
-                  <span className="v2-preview-kicker">被动</span>
-                  <b>{preview.passive.name}</b>
-                  <p>{preview.passive.text}</p>
-                </div>
-                {preview.actives.map((module) => (
-                  <div className="v2-preview-card" data-kind="active" key={module.id}>
-                    <span className="v2-preview-kicker">{module.cost ? `共鸣 ${module.cost}` : '免费'}</span>
-                    <b>{module.name}</b>
-                    <p>{module.text}</p>
+            <div className="v2-preview-section">
+              <span className="v2-rubric">第三步 · 显影预览与召唤</span>
+              <div className="v2-preview">
+                <div className="v2-preview-left">
+                  <div className="v2-preview-figure">
+                    <div className="v2-preview-sprite">
+                      <MonsterSprite
+                        recipe={preview.visual}
+                        mood="happy"
+                        title={draft.name || preview.name}
+                      />
+                    </div>
+                    <div className="v2-preview-identity">
+                      <b>{draft.name || preview.name}</b>
+                      <p className="v2-preview-flavor">{draft.flavor || preview.flavor}</p>
+                    </div>
                   </div>
-                ))}
-                <div className="v2-preview-card" data-kind="support">
-                  <span className="v2-preview-kicker">支援指令</span>
-                  <b>{preview.support.name}</b>
-                  <p>{preview.support.text}</p>
+                  <div className="v2-preview-stats">
+                    <div className="v2-budget">
+                      <span>数值预算</span>
+                      <b>{preview.budget} / 75</b>
+                    </div>
+                    {[
+                      { label: 'HP', value: preview.stats.hp, max: STAT_RANGES.hp[1] },
+                      { label: 'ATK', value: preview.stats.atk, max: STAT_RANGES.atk[1] },
+                      { label: 'DEF', value: preview.stats.def, max: STAT_RANGES.def[1] },
+                      { label: 'SPD', value: preview.stats.spd, max: STAT_RANGES.spd[1] },
+                    ].map((stat) => (
+                      <div className="v2-stat-line" key={stat.label}>
+                        <div className="v2-stat-meta">
+                          <span>{stat.label}</span>
+                          <b>{stat.value}</b>
+                        </div>
+                        <div className="v2-stat-meter" aria-hidden="true">
+                          <i style={{ width: `${Math.min(100, Math.round((stat.value / stat.max) * 100))}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="v2-preview-skills">
+                  <div className="v2-preview-card" data-kind="passive">
+                    <span className="v2-preview-kicker">被动</span>
+                    <b>{preview.passive.name}</b>
+                    <p>{preview.passive.text}</p>
+                  </div>
+                  {preview.actives.map((module) => (
+                    <div className="v2-preview-card" data-kind="active" key={module.id}>
+                      <span className="v2-preview-kicker">{module.cost ? `共鸣 ${module.cost}` : '免费'}</span>
+                      <b>{module.name}</b>
+                      <p>{module.text}</p>
+                    </div>
+                  ))}
+                  <div className="v2-preview-card" data-kind="support">
+                    <span className="v2-preview-kicker">支援指令</span>
+                    <b>{preview.support.name}</b>
+                    <p>{preview.support.text}</p>
+                  </div>
                 </div>
               </div>
             </div>

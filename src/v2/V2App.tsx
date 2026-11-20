@@ -705,6 +705,7 @@ export function V2App() {
 
   return (
     <div className="v2-app">
+      <div className="grain" aria-hidden="true" />
       <header className="v2-topbar">
         <button type="button" className="v2-wordmark" onClick={() => setScreen('capture')}>
           <span>江城万物怪</span>
@@ -740,6 +741,7 @@ export function V2App() {
       <main className="v2-shell">
         <NextStepBar
           save={save}
+          currentScreen={screen}
           onNavigate={(target) => {
             setSelectedRegionId(save.activeRegionId);
             setScreen(target);

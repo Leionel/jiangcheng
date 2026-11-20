@@ -3,11 +3,11 @@ import type { RegionId, SaveV2 } from '../domain/types';
 import { REGIONS, REGION_ORDER, getEnemy } from '../domain/region';
 
 const POS: Record<RegionId, { x: number; y: number; labelX: number; labelY: number }> = {
-  river: { x: 600, y: 390, labelX: 600, labelY: 246 },
-  zao: { x: 185, y: 150, labelX: 185, labelY: 34 },
-  bridge: { x: 255, y: 560, labelX: 255, labelY: 646 },
-  sakura: { x: 985, y: 160, labelX: 985, labelY: 36 },
-  thunder: { x: 965, y: 565, labelX: 965, labelY: 646 },
+  river: { x: 600, y: 390, labelX: 600, labelY: 200 },
+  zao: { x: 185, y: 150, labelX: 190, labelY: 56 },
+  bridge: { x: 255, y: 560, labelX: 295, labelY: 668 },
+  sakura: { x: 985, y: 160, labelX: 980, labelY: 56 },
+  thunder: { x: 965, y: 565, labelX: 965, labelY: 668 },
 };
 
 function regionStatus(save: SaveV2, id: RegionId): { label: string; state: 'locked' | 'ready' | 'active' | 'done' } {
@@ -27,6 +27,7 @@ export function JiangchengMap({
   selectedRegionId: RegionId;
   onSelect: (id: RegionId) => void;
 }) {
+  const selectedPos = POS[selectedRegionId];
   return (
     <div className="v2-world-wrap">
       <div className="v2-map-head">
@@ -273,10 +274,17 @@ export function JiangchengMap({
             <text x="1110" y="662" textAnchor="middle" fontSize="12.5" fill="#14212b" fontFamily="'PingFang SC', 'Microsoft YaHei', sans-serif">
               N
             </text>
-            <path d="M80 690 h64 M80 686 v 8 M112 686 v 8 M144 686 v 8" stroke="#14212b" strokeWidth="1.5" />
-            <text x="154" y="694" fontSize="12.5" fill="#4c5a63" fontFamily="'PingFang SC', 'Microsoft YaHei', sans-serif">
+            <path d="M40 690 h64 M40 686 v 8 M72 686 v 8 M104 686 v 8" stroke="#14212b" strokeWidth="1.5" />
+            <text x="114" y="694" fontSize="12.5" fill="#4c5a63" fontFamily="'PingFang SC', 'Microsoft YaHei', sans-serif">
               虚构比例
             </text>
+          </g>
+
+          {/* 当前选中区域的动态观测脉冲信标与坐标十字准星 */}
+          <g className="v2-map-beacon" transform={`translate(${selectedPos.x} ${selectedPos.y})`}>
+            <circle className="v2-beacon-pulse" r="46" fill="none" stroke="#e2402b" strokeWidth="2.2" strokeDasharray="8 5" />
+            <circle r="60" fill="none" stroke="#e2402b" strokeOpacity="0.32" strokeWidth="1.5" strokeDasharray="3 6" />
+            <path d="M-74 0 h18 M56 0 h18 M0 -74 v18 M0 56 v18" stroke="#e2402b" strokeOpacity="0.7" strokeWidth="1.6" />
           </g>
         </svg>
 
@@ -285,17 +293,19 @@ export function JiangchengMap({
           const region = REGIONS[id];
           const pos = POS[id];
           const status = regionStatus(save, id);
+          const selected = id === selectedRegionId;
           return (
             <button
               type="button"
               className="v2-world-label"
               key={id}
               data-state={status.state}
-              data-selected={id === selectedRegionId}
+              data-selected={selected}
               style={{ left: `${(pos.labelX / 1200) * 100}%`, top: `${(pos.labelY / 720) * 100}%`, '--region': region.accent } as CSSProperties}
               onClick={() => onSelect(id)}
-              aria-pressed={id === selectedRegionId}
+              aria-pressed={selected}
             >
+              {selected ? <span className="v2-world-label-tag">当前观测</span> : null}
               <span className="v2-world-label-name">
                 <i />
                 {region.name}

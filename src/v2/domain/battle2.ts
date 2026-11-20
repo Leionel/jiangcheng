@@ -434,7 +434,13 @@ function dealDamageToEnemy(state: ExpeditionBattleState, raw: number): number {
   return damage;
 }
 
-function enemyDamageMultiplier(state: ExpeditionBattleState, skillPower: number, activeSkill: ActiveModule | null): { damage: number; multiplier: number } {
+const BASIC_POWER = 8;
+
+function computePlayerDamage(
+  state: ExpeditionBattleState,
+  skillPower: number,
+  activeSkill: ActiveModule | null,
+): { damage: number; multiplier: number } {
   const active = activeCreature(state);
   const enemy = state.enemy;
   const charge = statusOf(active.statuses, 'charge');
@@ -449,10 +455,37 @@ function enemyDamageMultiplier(state: ExpeditionBattleState, skillPower: number,
   if (active.creature.passiveId === 'P07' && active.lastSkillId && active.lastSkillId !== activeSkill?.id) raw += 3;
   if (active.swapBonus > 0) {
     raw += active.swapBonus;
-    active.swapBonus = 0;
   }
-  if (charge > 0) active.statuses = consumeStatus(active.statuses, 'charge', charge);
   return { damage: clamp(Math.round(raw), 3, 55), multiplier: typeMult };
+}
+
+function enemyDamageMultiplier(
+  state: ExpeditionBattleState,
+  skillPower: number,
+  activeSkill: ActiveModule | null,
+): { damage: number; multiplier: number } {
+  const active = activeCreature(state);
+  const result = computePlayerDamage(state, skillPower, activeSkill);
+  const charge = statusOf(active.statuses, 'charge');
+  if (active.swapBonus > 0) active.swapBonus = 0;
+  if (charge > 0) active.statuses = consumeStatus(active.statuses, 'charge', charge);
+  return result;
+}
+
+/** 供 UI 预览主战技能或普通攻击的预计伤害与属性克制倍率（无副作用） */
+export function estimatePlayerSkillDamage(
+  state: ExpeditionBattleState,
+  skillId?: string,
+): { damage: number; multiplier: number } {
+  const active = activeCreature(state);
+  const multiplier = typeMultiplier(active.creature.element, state.enemy.def.element);
+  if (!skillId) return computePlayerDamage(state, BASIC_POWER, null);
+  const module = ACTIVE_BY_ID.get(skillId) ?? null;
+  if (!module || (module.effect.kind !== 'damage' && module.effect.kind !== 'control')) {
+    return { damage: 0, multiplier };
+  }
+  const power = module.effect.kind === 'damage' ? module.effect.power : module.effect.damage;
+  return computePlayerDamage(state, power, module);
 }
 
 function applyActiveSkill(state: ExpeditionBattleState, module: ActiveModule): void {
@@ -907,7 +940,7 @@ export function resolveRound(state: ExpeditionBattleState, input: PlayerRoundInp
       detail: cost === 0 ? '桥接：本次换位不消耗共鸣' : `消耗 ${cost} 点共鸣`,
     });
   } else if (input.main.kind === 'basic') {
-    const { damage, multiplier } = enemyDamageMultiplier(next, 8, null);
+    const { damage, multiplier } = enemyDamageMultiplier(next, BASIC_POWER, null);
     const applied = dealDamageToEnemy(next, damage);
     if (multiplier > 1.01) addResonance(next, 1);
     next.log.push({

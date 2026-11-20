@@ -1,20 +1,45 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import type { BuildPath, ExpeditionBattleState, RegionId, RegionRunState, SaveV2, V2Creature } from '../domain/types';
 import type { EnemyDef, RegionNodeDef } from '../domain/types';
 import { PATH_META, TAG_LABELS, tagDimension } from '../domain/tags';
-import { ACTIVE_BY_ID, PASSIVE_BY_ID } from '../content/modules';
+import { ACTIVE_BY_ID, LINKS, PASSIVE_BY_ID } from '../content/modules';
 import { getEnemy, getEvent, getRegion, currentNode, nodeProgress } from '../domain/region';
-import { bondLabel } from '../domain/bonds';
+import { bondLabel, bondLevel } from '../domain/bonds';
 import { QUEST_DEFS, completedQuestCount, questProgress, questState } from '../domain/quests';
 import { canEvolve } from '../domain/evolution';
 import { evolutionBranchName } from '../content/evolutions';
 import { xpPercent, xpToNext } from '../domain/growth';
 import { battleSummary } from '../domain/battle2';
 import { v2AiLog } from '../ai/gateway';
-import { ELEMENTS } from '../../features/monsters/elements';
+import { ELEMENTS, matchupLabel, typeMultiplier } from '../../features/monsters/elements';
 import { MonsterSprite } from '../../features/monsters/MonsterSprite';
 import { JiangchengMap } from './JiangchengMap';
+
+const BOND_TIER_NAME = ['初识', '搭把手', '一起走', '过命的'] as const;
+
+const BOSS_RULE_LABEL: Record<string, string> = {
+  storm: '暴雨机制',
+  heat: '热度机制',
+  lock: '封锁机制',
+  record: '抄录机制',
+  thunder: '三段过载',
+};
+
+const BOSS_RULE_TIP: Record<string, string> = {
+  storm: '建议携带护盾或防御应对暴雨',
+  heat: '注意热度 3 层会触发锅气爆炒',
+  lock: '注意留好防御与普攻应对封锁回合',
+  record: '记得轮换招式避免被抄录反制',
+  thunder: '血量 2/3 与 1/3 会升级，预留护盾应对全域过载',
+};
+
+const NODE_TYPE_META: Record<RegionNodeDef['type'], { icon: string; label: string }> = {
+  event: { icon: '✦', label: '事件' },
+  battle: { icon: '⚔', label: '战斗' },
+  elite: { icon: '◈', label: '精英' },
+  boss: { icon: '★', label: 'Boss' },
+};
 
 const FLAG_LABEL: Record<string, string> = {
   lamp_lit: '把灯点亮',
@@ -227,6 +252,9 @@ export function PartyWorkshop({
                       移出
                     </button>
                   </div>
+                  <span className="v2-equip-caption">
+                    出战招式（已装备 {creature.equipped.length}/{creature.actives.length} · 点击切换）
+                  </span>
                   <div className="v2-equip-row">
                     {creature.actives.map((id) => {
                       const module = ACTIVE_BY_ID.get(id)!;
@@ -253,6 +281,56 @@ export function PartyWorkshop({
           );
         })}
       </div>
+
+      {(() => {
+        const partyPaths = new Set(party.map((item) => item.buildPath));
+        const currentBond = bondLevel(save.bondPoints);
+        const readyCount = LINKS.filter((link) => {
+          const hasPaths = link.requires.every((path) => partyPaths.has(path as BuildPath));
+          const hasBond = (link.minBond ?? 0) <= currentBond;
+          return party.length === 3 && hasPaths && hasBond;
+        }).length;
+        return (
+          <div className="v2-synergy-bar">
+            <div className="v2-synergy-head">
+              <div>
+                <p className="v2-rubric">队伍连携与战术就绪台</p>
+                <span className="fineprint">
+                  当前队伍倾向：{party.length ? party.map((item) => PATH_META[item.buildPath].name).join(' / ') : '暂无'} · 已激活 {readyCount} / {LINKS.length} 条连携
+                </span>
+              </div>
+              <span className="v2-badge" data-kind="resource">羁绊档位 · {BOND_TIER_NAME[currentBond]}</span>
+            </div>
+            <div className="v2-synergy-grid">
+              {LINKS.map((link) => {
+                const hasPaths = link.requires.every((path) => partyPaths.has(path as BuildPath));
+                const requiredBond = link.minBond ?? 0;
+                const hasBond = requiredBond <= currentBond;
+                const ready = party.length === 3 && hasPaths && hasBond;
+                const reasons: string[] = [];
+                if (!hasPaths) reasons.push(`需队伍含【${link.requires.map((p) => PATH_META[p as BuildPath].name).join('+')}】`);
+                if (!hasBond) reasons.push(`需羁绊达到【${BOND_TIER_NAME[requiredBond] ?? '更高'}】`);
+                if (party.length < 3 && reasons.length === 0) reasons.push('需先凑满 3 只上阵');
+                return (
+                  <div className="v2-synergy-card" key={link.id} data-ready={ready}>
+                    <div className="v2-synergy-title">
+                      <b>{link.name}</b>
+                      <span className="v2-badge" data-kind="cost">共鸣 {link.cost}</span>
+                      <span className="v2-badge" data-kind={ready ? 'support' : 'mode'}>
+                        {ready ? '已激活可用' : '待解锁'}
+                      </span>
+                    </div>
+                    <p className="v2-synergy-text">{link.text}</p>
+                    <p className="v2-synergy-req">
+                      {ready ? '战斗中消耗共鸣即可在右侧直接发动' : reasons.join(' · ')}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="v2-roster-head">
         <div>
@@ -319,6 +397,21 @@ export function RegionMap({
   const progress = run ? nodeProgress(run) : { current: 0, total: region.nodes.length };
   const unlockRegion = region.unlockAfter ? getRegion(region.unlockAfter) : null;
   const regionState = completed ? 'done' : run ? 'active' : unlocked ? 'ready' : 'locked';
+  const activeNodeIndex = run ? Math.min(run.nodeIndex, region.nodes.length - 1) : 0;
+  const [inspectingIndex, setInspectingIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    setInspectingIndex(null);
+  }, [selectedRegionId, run?.nodeIndex, Boolean(run), completed]);
+
+  const isInspecting = inspectingIndex !== null && (completed || !run || inspectingIndex !== activeNodeIndex);
+  const inspectedNode = isInspecting ? region.nodes[inspectingIndex] : null;
+  const inspectedEvent = inspectedNode?.eventId ? getEvent(inspectedNode.eventId) : null;
+  const inspectedEnemy = inspectedNode?.enemyId ? getEnemy(inspectedNode.enemyId) : null;
+  const leadCreature =
+    save.collection.find((item) => item.id === save.party.ids[save.party.activeIndex]) ??
+    save.collection.find((item) => item.id === save.party.ids[0]) ??
+    null;
 
   return (
     <section className="v2-panel">
@@ -351,23 +444,96 @@ export function RegionMap({
             <span className="v2-region-stamp" data-state={regionState}>{region.landmark}</span>
           </div>
 
+          {run ? (
+            <div className="v2-run-buffs" aria-label="区域线索与战前增益">
+              <span className="v2-badge" data-kind="resource" data-boost={run.startResonance > 2}>
+                开局共鸣 {run.startResonance}
+              </span>
+              {run.startShield > 0 ? (
+                <span className="v2-badge" data-kind="support">开局护盾 +{run.startShield}</span>
+              ) : null}
+              {run.bossHpDelta < 0 ? (
+                <span className="v2-badge" data-kind="ai">Boss 血量 {run.bossHpDelta}%</span>
+              ) : null}
+              <span className="v2-run-flags">
+                已留线索：
+                {run.flags.length > 0
+                  ? run.flags.map((flag) => FLAG_LABEL[flag] ?? flag).join('、')
+                  : '暂无（事件选择可留下线索，解锁后续隐藏选项）'}
+              </span>
+            </div>
+          ) : null}
+
           <ol className="v2-route-key" aria-label={`${region.name}五站`}>
             {region.nodes.map((item, index) => {
               const state = completed || index < (run?.nodeIndex ?? 0) ? 'done' : index === (run?.nodeIndex ?? -1) ? 'current' : 'locked';
+              const meta = NODE_TYPE_META[item.type];
+              const stateLabel = state === 'done' ? '已完成' : state === 'current' ? '当前站' : '待探索';
               return (
-                <li className="v2-route-key-item" data-state={state} key={item.id}>
-                  <span className="v2-route-key-num">{index + 1}</span>
-                  <div>
-                    <b>{item.title}</b>
-                    <span>{item.type === 'event' ? '事件' : item.type === 'boss' ? 'Boss' : item.type === 'elite' ? '精英' : '战斗'}</span>
-                  </div>
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    className="v2-route-key-item"
+                    data-state={state}
+                    data-inspected={inspectingIndex === index}
+                    onClick={() => setInspectingIndex(inspectingIndex === index ? null : index)}
+                    title={`点击查阅第 ${index + 1} 站：${item.title}`}
+                  >
+                    <span className="v2-route-key-num">{index + 1}</span>
+                    <div>
+                      <b>{item.title}</b>
+                      <span>{meta.icon} {meta.label} · {stateLabel}</span>
+                    </div>
+                  </button>
                 </li>
               );
             })}
           </ol>
 
           <div className="v2-node-panel">
-            {!unlocked ? (
+            {isInspecting && inspectedNode ? (
+              <div className="v2-inspect-view">
+                <div className="v2-inspect-banner">
+                  <span>正在查阅第 {inspectingIndex! + 1} 站情报（只读预览）</span>
+                  <button type="button" className="v2-btn v2-btn-sm" onClick={() => setInspectingIndex(null)}>
+                    返回当前节点
+                  </button>
+                </div>
+                <p className="v2-rubric">
+                  {NODE_TYPE_META[inspectedNode.type].icon} {NODE_TYPE_META[inspectedNode.type].label} · 第 {inspectingIndex! + 1} 站
+                </p>
+                <h3 className="v2-h3">{inspectedNode.title}</h3>
+                <p className="v2-lede">{inspectedNode.desc}</p>
+                {inspectedNode.type === 'event' && inspectedEvent ? (
+                  <div className="v2-inspect-detail">
+                    <p className="fineprint">{inspectedEvent.text}</p>
+                    <div className="v2-inspect-choices">
+                      {inspectedEvent.choices.map((choice) => (
+                        <span className="v2-mini-tag" key={choice.id}>
+                          {choice.label}：{choice.desc}
+                          {choice.requiresFlag ? `（需线索：${FLAG_LABEL[choice.requiresFlag] ?? choice.requiresFlag}）` : ''}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : inspectedEnemy ? (
+                  <div className="v2-inspect-detail">
+                    <div className="v2-specimen-badges">
+                      <ElementBadge element={inspectedEnemy.element} />
+                      <span className="v2-badge" data-kind="mode">
+                        HP {inspectedEnemy.maxHp} · ATK {inspectedEnemy.atk} · DEF {inspectedEnemy.def}
+                      </span>
+                      {leadCreature ? (
+                        <span className="v2-badge" data-kind="rule">
+                          主战「{leadCreature.name}」对其{matchupLabel(typeMultiplier(leadCreature.element, inspectedEnemy.element))}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="fineprint">{inspectedEnemy.taunt}</p>
+                  </div>
+                ) : null}
+              </div>
+            ) : !unlocked ? (
               <div className="v2-region-locked">
                 <b>尚未解锁</b>
                 <p className="v2-lede">
@@ -455,7 +621,10 @@ export function RegionMap({
             <div className="v2-enemy-preview-main">
               <div className="v2-specimen-badges">
                 <span className="v2-badge" data-kind="boss">{boss?.kind === 'boss' ? '区域 Boss' : '未知'}</span>
-                <span className="v2-badge" data-kind="element"><i style={{ background: region.accent }} />{region.accent}</span>
+                {boss ? <ElementBadge element={boss.element} /> : null}
+                <span className="v2-badge" data-kind="boss-rule">
+                  {boss?.bossRule ? BOSS_RULE_LABEL[boss.bossRule] : '区域机制'}
+                </span>
               </div>
               <b>{boss?.name}</b>
               <p className="v2-enemy-preview-taunt">{boss?.taunt}</p>
@@ -464,6 +633,12 @@ export function RegionMap({
                 <span><em>ATK</em><b>{boss?.atk ?? '—'}</b></span>
                 <span><em>DEF</em><b>{boss?.def ?? '—'}</b></span>
               </div>
+              {boss && leadCreature ? (
+                <p className="v2-boss-tip">
+                  当前主战「{leadCreature.name}」对其属性{matchupLabel(typeMultiplier(leadCreature.element, boss.element))}；
+                  {boss.bossRule ? BOSS_RULE_TIP[boss.bossRule] : '注意观察敌方下一步意图'}。
+                </p>
+              ) : null}
             </div>
           </div>
 

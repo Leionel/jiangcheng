@@ -337,7 +337,23 @@ export default function App() {
           >
             图鉴<span className="nav-count">{gallery.length}</span>
           </button>
-          <a className="nav-tab" href="?v2=1" style={{ textDecoration: 'none' }} title="进入 2.0 探索切片">
+          <a
+            className="nav-tab nav-tab--v2"
+            href="?v2=1"
+            style={{
+              textDecoration: 'none',
+              borderColor: 'var(--riso-red)',
+              color: 'var(--riso-red)',
+              background: 'rgba(226, 64, 43, 0.07)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: 700,
+              boxShadow: '2px 2px 0 rgba(226, 64, 43, 0.25)',
+            }}
+            title="进入 2.0 探索切片（五区地图 / 语义捕获 / 三人小队）"
+          >
+            <span className="stamp-dot" aria-hidden="true" />
             2.0 试玩 ↗
           </a>
           <span className="stamp" data-mode={modeKey}>
