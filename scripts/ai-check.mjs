@@ -199,9 +199,48 @@ console.log(
 );
 
 
+console.log('· /api/ai/quest-director（2.0 任务指引）');
+const questDirector = await postJson('/api/ai/quest-director', {
+  region: '过早巷',
+  quests: [
+    { id: 'q_first_win', title: '第一场胜仗', desc: '在探索战里赢下一场。', progress: 1, target: 1 },
+    { id: 'q_zao_clear', title: '过早巷的锅气', desc: '击破早味大厨。', progress: 2, target: 1 },
+  ],
+  party: [
+    { name: '伞团团', buildPath: 'guardian', level: 3 },
+    { name: '面咕噜', buildPath: 'trickster', level: 3 },
+    { name: '渡江仔', buildPath: 'mover', level: 3 },
+  ],
+  materials: 4,
+  tokens: 2,
+  bond: '搭把手',
+});
+assert(questDirector.status === 200, `quest-director HTTP 200（实际 ${questDirector.status}）`);
+assert(questDirector.json?.mode === 'live_ai', 'quest-director 返回 live_ai');
+assert(['q_first_win', 'q_zao_clear'].includes(questDirector.json?.plan?.questId), 'quest-director 只选合法任务');
+console.log(`  任务：${questDirector.json?.plan?.questId} · 理由：${questDirector.json?.plan?.reason ?? '—'} · ${questDirector.latencyMs}ms`);
+
+console.log('· /api/ai/evolution-guide（2.0 进化指引）');
+const evolutionGuide = await postJson('/api/ai/evolution-guide', {
+  creature: { name: '伞团团', level: 3, buildPath: 'guardian', stats: { hp: 95, atk: 25, def: 17, spd: 11 } },
+  branches: [
+    { id: 'umbrella_guard', name: '伞骨卫士', path: 'guardian', desc: '更厚更稳', statBonus: { hp: 14, atk: 1, def: 3, spd: 0 } },
+    { id: 'umbrella_striker', name: '雨幕刺客', path: 'striker', desc: '更快的输出', statBonus: { hp: 6, atk: 4, def: 0, spd: 2 } },
+  ],
+  party: [
+    { name: '面咕噜', buildPath: 'trickster', level: 2 },
+    { name: '渡江仔', buildPath: 'mover', level: 2 },
+  ],
+  region: '江风渡口',
+});
+assert(evolutionGuide.status === 200, `evolution-guide HTTP 200（实际 ${evolutionGuide.status}）`);
+assert(evolutionGuide.json?.mode === 'live_ai', 'evolution-guide 返回 live_ai');
+assert(['umbrella_guard', 'umbrella_striker'].includes(evolutionGuide.json?.plan?.branchId), 'evolution-guide 只选合法分支');
+console.log(`  分支：${evolutionGuide.json?.plan?.branchId} · 理由：${evolutionGuide.json?.plan?.reason ?? '—'} · ${evolutionGuide.latencyMs}ms`);
 if (failures.length) {
   console.error(`\n失败 ${failures.length} 项：`);
   failures.forEach((item) => console.error(' -', item));
   process.exit(1);
 }
-console.log('\n真实 AI 链路全部通过（analyze + battle-plan + analyze-object + battle-director）。');
+console.log('\n真实 AI 链路全部通过（analyze + battle-plan + analyze-object + battle-director + quest-director + evolution-guide）。');
+

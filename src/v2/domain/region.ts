@@ -1,3 +1,4 @@
+import { hashString } from '../../shared/rng';
 import type {
   EnemyDef,
   EventChoice,
@@ -175,7 +176,7 @@ export const EVENTS: Record<string, GameEvent> = {
     title: '雾中信号灯',
     text: '渡口的信号灯坏了。雾里有一串忽明忽暗的光，像是有人在对岸等你。',
     choices: [
-      { id: 'light', label: '用照明能力点灯', desc: '下一场战斗开局 +2 共鸣', effect: { kind: 'runResonance', amount: 2 } },
+      { id: 'light', label: '用照明能力点灯', desc: '下一场战斗开局 +2 共鸣', effect: { kind: 'runResonance', amount: 2 }, flags: ['lamp_lit'] },
       { id: 'dark', label: '摸黑绕过去', desc: '捡到 2 份材料', effect: { kind: 'materials', amount: 2 } },
     ],
   },
@@ -184,7 +185,7 @@ export const EVENTS: Record<string, GameEvent> = {
     title: '渡船缆绳松了',
     text: '老船工蹲在船头，缆绳磨得只剩一半。他问你要不要搭把手。',
     choices: [
-      { id: 'repair', label: '帮忙修船', desc: '下一场战斗开局 +3 共鸣', effect: { kind: 'runResonance', amount: 3 } },
+      { id: 'repair', label: '帮忙修船', desc: '下一场战斗开局 +3 共鸣', effect: { kind: 'runResonance', amount: 3 }, flags: ['ferry_fixed'] },
       { id: 'rush', label: '先赶路', desc: '捡到 1 份材料', effect: { kind: 'materials', amount: 1 } },
     ],
   },
@@ -193,7 +194,7 @@ export const EVENTS: Record<string, GameEvent> = {
     title: '早市蒸汽',
     text: '沿街的蒸笼一起掀盖，白汽把整条巷子蒸得发亮。',
     choices: [
-      { id: 'join', label: '挤进蒸汽里取暖', desc: '下一场战斗开局 +2 共鸣', effect: { kind: 'runResonance', amount: 2 } },
+      { id: 'join', label: '挤进蒸汽里取暖', desc: '下一场战斗开局 +2 共鸣', effect: { kind: 'runResonance', amount: 2 }, flags: ['warm'] },
       { id: 'pack', label: '打包两份带走', desc: '获得 2 材料', effect: { kind: 'materials', amount: 2 } },
     ],
   },
@@ -202,7 +203,7 @@ export const EVENTS: Record<string, GameEvent> = {
     title: '排队的人',
     text: '前面的人忘了带钱，摊主看着他，他身后的人都看着摊主。',
     choices: [
-      { id: 'help', label: '替他付了', desc: '队伍羁绊 +2', effect: { kind: 'bond', amount: 2 } },
+      { id: 'help', label: '替他付了', desc: '队伍羁绊 +2', effect: { kind: 'bond', amount: 2 }, flags: ['zao_helped'] },
       { id: 'grab', label: '趁乱多拿一份', desc: '获得 2 材料', effect: { kind: 'materials', amount: 2 } },
     ],
   },
@@ -211,7 +212,7 @@ export const EVENTS: Record<string, GameEvent> = {
     title: '断桥',
     text: '桥面断了一截。缺口下的江水很急，对面的灯还亮着。',
     choices: [
-      { id: 'connect', label: '用连接能力搭桥', desc: '下一场战斗开局 +3 共鸣', effect: { kind: 'runResonance', amount: 3 } },
+      { id: 'connect', label: '用连接能力搭桥', desc: '下一场战斗开局 +3 共鸣', effect: { kind: 'runResonance', amount: 3 }, flags: ['bridge_connected'] },
       { id: 'detour', label: '沿桥墩绕过去', desc: '获得 2 材料', effect: { kind: 'materials', amount: 2 } },
     ],
   },
@@ -220,7 +221,7 @@ export const EVENTS: Record<string, GameEvent> = {
     title: '工具箱',
     text: '桥工把工具箱落在了桥洞里。里面有一枚旧信物。',
     choices: [
-      { id: 'repair', label: '帮桥工把桥修好', desc: '获得 1 信物', effect: { kind: 'tokens', amount: 1 } },
+      { id: 'repair', label: '帮桥工把桥修好', desc: '获得 1 信物', effect: { kind: 'tokens', amount: 1 }, flags: ['bridge_fixed'] },
       { id: 'scrap', label: '拆下还能用的零件', desc: '获得 3 材料', effect: { kind: 'materials', amount: 3 } },
     ],
   },
@@ -229,7 +230,7 @@ export const EVENTS: Record<string, GameEvent> = {
     title: '落樱',
     text: '花瓣落得很慢。每接住一片，就想起一个很久以前的名字。',
     choices: [
-      { id: 'catch', label: '接住一片', desc: '队伍羁绊 +2', effect: { kind: 'bond', amount: 2 } },
+      { id: 'catch', label: '接住一片', desc: '队伍羁绊 +2', effect: { kind: 'bond', amount: 2 }, flags: ['petal_kept'] },
       { id: 'sweep', label: '扫成一小堆', desc: '获得 2 材料', effect: { kind: 'materials', amount: 2 } },
     ],
   },
@@ -238,7 +239,7 @@ export const EVENTS: Record<string, GameEvent> = {
     title: '旧照片',
     text: '树下压着一张旧照片：五个人站在还没修好的桥上，笑得很亮。',
     choices: [
-      { id: 'remember', label: '把照片收进手册', desc: '下一场战斗开局 +2 共鸣', effect: { kind: 'runResonance', amount: 2 } },
+      { id: 'remember', label: '把照片收进手册', desc: '下一场战斗开局 +2 共鸣', effect: { kind: 'runResonance', amount: 2 }, flags: ['photo_kept'] },
       { id: 'leave', label: '留在原处', desc: '获得 1 信物', effect: { kind: 'tokens', amount: 1 } },
     ],
   },
@@ -247,7 +248,7 @@ export const EVENTS: Record<string, GameEvent> = {
     title: '跳闸',
     text: '整座创想站突然断电，只有走廊尽头的线圈还在发蓝光。',
     choices: [
-      { id: 'switch', label: '摸黑合闸', desc: '下一场战斗开局 +3 共鸣', effect: { kind: 'runResonance', amount: 3 } },
+      { id: 'switch', label: '摸黑合闸', desc: '下一场战斗开局 +3 共鸣', effect: { kind: 'runResonance', amount: 3 }, flags: ['power_on'] },
       { id: 'scavenge', label: '拆几块电池', desc: '获得 3 材料', effect: { kind: 'materials', amount: 3 } },
     ],
   },
@@ -256,8 +257,99 @@ export const EVENTS: Record<string, GameEvent> = {
     title: '旧发明',
     text: '工作台上躺着一台没做完的机器，标签上写着「给江城的回响」。',
     choices: [
-      { id: 'start', label: '启动它', desc: '队伍羁绊 +2', effect: { kind: 'bond', amount: 2 } },
+      { id: 'start', label: '启动它', desc: '队伍羁绊 +2', effect: { kind: 'bond', amount: 2 }, flags: ['invention_started'] },
       { id: 'parts', label: '拆成零件', desc: '获得 1 信物', effect: { kind: 'tokens', amount: 1 } },
+    ],
+  },
+  /* ---------------- 10 个额外事件：用于第二事件节点轮换与后续影响 ---------------- */
+  ev_river_tide: {
+    id: 'ev_river_tide',
+    title: '潮位读数',
+    text: '石阶上刻着旧潮位线。你蹲下去对照，发现今晚的水比刻痕高了一指。',
+    choices: [
+      { id: 'read', label: '记下潮位', desc: '下一场战斗全队 +8 护盾（潮汐预警）', effect: { kind: 'startShield', amount: 8 } },
+      { id: 'ignore', label: '不看了', desc: '获得 2 材料', effect: { kind: 'materials', amount: 2 } },
+    ],
+  },
+  ev_river_lantern: {
+    id: 'ev_river_lantern',
+    title: '对岸的灯',
+    text: '你点过的信号灯还在亮。灯下多了一只旧灯笼，像是有人特意放在那里。',
+    choices: [
+      { id: 'return', label: '把灯笼挂回塔上', desc: 'Boss 血量 -10%（提前削弱）', requiresFlag: 'lamp_lit', effect: { kind: 'bossHp', amount: -10 } },
+      { id: 'keep', label: '收进包里', desc: '获得 1 信物', effect: { kind: 'tokens', amount: 1 } },
+    ],
+  },
+  ev_zao_second: {
+    id: 'ev_zao_second',
+    title: '第二碗',
+    text: '摊主认出了你，什么也没问，又盛了一碗。汤面很烫，队伍安静了一会儿。',
+    choices: [
+      { id: 'eat', label: '坐下来吃完', desc: '开局护盾 +8，羁绊 +1', requiresFlag: 'zao_helped', effect: { kind: 'startShield', amount: 8 } },
+      { id: 'pack', label: '打包带走', desc: '获得 2 材料', effect: { kind: 'materials', amount: 2 } },
+    ],
+  },
+  ev_zao_spice: {
+    id: 'ev_zao_spice',
+    title: '最后一勺辣油',
+    text: '老板把一勺辣油递过来：「大厨怕这个。」',
+    choices: [
+      { id: 'take', label: '收下辣油', desc: 'Boss 血量 -8%，开局 +6 护盾', effect: { kind: 'bossHp', amount: -8 } },
+      { id: 'sell', label: '拿去换材料', desc: '获得 3 材料', effect: { kind: 'materials', amount: 3 } },
+    ],
+  },
+  ev_bridge_rivet: {
+    id: 'ev_bridge_rivet',
+    title: '最后几颗铆钉',
+    text: '桥工说，桥面还差几颗铆钉。你低头看，脚边正好有一盒。',
+    choices: [
+      { id: 'fix', label: '把铆钉补上', desc: '下一战全队 +8 护盾', effect: { kind: 'startShield', amount: 8 } },
+      { id: 'keep', label: '留着当材料', desc: '获得 2 材料', effect: { kind: 'materials', amount: 2 } },
+    ],
+  },
+  ev_bridge_blueprint: {
+    id: 'ev_bridge_blueprint',
+    title: '工图残页',
+    text: '桥洞里压着半张工图，画着守卫的受力点。',
+    choices: [
+      { id: 'study', label: '把受力点记下来', desc: 'Boss 血量 -12%', requiresFlag: 'bridge_fixed', effect: { kind: 'bossHp', amount: -12 } },
+      { id: 'burn', label: '烧掉取暖', desc: '获得 3 材料', effect: { kind: 'materials', amount: 3 } },
+    ],
+  },
+  ev_sakura_letter: {
+    id: 'ev_sakura_letter',
+    title: '夹在花里的信',
+    text: '一片花瓣背面写着小字：别把同一招用两次，它都记得。',
+    choices: [
+      { id: 'read', label: '把提醒告诉队伍', desc: '开局 +10 护盾（有备而来）', requiresFlag: 'petal_kept', effect: { kind: 'startShield', amount: 10 } },
+      { id: 'keep', label: '把信收起来', desc: '获得 1 信物', effect: { kind: 'tokens', amount: 1 } },
+    ],
+  },
+  ev_sakura_seed: {
+    id: 'ev_sakura_seed',
+    title: '一颗种子',
+    text: '树根边有一颗没发芽的种子。档案员大概不会注意到它。',
+    choices: [
+      { id: 'plant', label: '种在坡上', desc: '羁绊 +2，开局 +6 护盾', effect: { kind: 'startShield', amount: 6 } },
+      { id: 'take', label: '带回去研究', desc: '获得 2 材料', effect: { kind: 'materials', amount: 2 } },
+    ],
+  },
+  ev_thunder_battery: {
+    id: 'ev_thunder_battery',
+    title: '备用电池',
+    text: '配电室里有一排备用电池，还有一张手写便条：「别让主脑知道」。',
+    choices: [
+      { id: 'install', label: '装到护盾回路', desc: '下一战全队 +10 护盾', effect: { kind: 'startShield', amount: 10 } },
+      { id: 'take', label: '拆走两块', desc: '获得 3 材料', effect: { kind: 'materials', amount: 3 } },
+    ],
+  },
+  ev_thunder_blueprint: {
+    id: 'ev_thunder_blueprint',
+    title: '主脑的图纸',
+    text: '图纸上标着主脑的三个供电节点。你只需要掐掉一个。',
+    choices: [
+      { id: 'cut', label: '标记节点', desc: 'Boss 血量 -12%', requiresFlag: 'invention_started', effect: { kind: 'bossHp', amount: -12 } },
+      { id: 'sell', label: '卷起来换钱', desc: '获得 1 信物', effect: { kind: 'tokens', amount: 1 } },
     ],
   },
 };
@@ -273,6 +365,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
     bossId: 'riv_boss',
     landmark: '信号塔与渡船',
     blurb: '雾把江面压得很低，渡船还在等最后一班人。',
+    extraEvents: ['ev_river_tide', 'ev_river_lantern'],
     nodes: [
       { id: 'river_0', type: 'event', title: '雾中信号灯', desc: '渡口的第一段路被雾吞掉了。', eventId: 'ev_fog_lamp' },
       { id: 'river_1', type: 'battle', title: '候船棚的潮气', desc: '一团潮气从长椅底下滚出来。', enemyId: 'riv_mist' },
@@ -289,6 +382,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
     bossId: 'zao_boss',
     landmark: '蒸笼与芝麻磨',
     blurb: '一条从清晨排到中午的巷子，所有锅都在同时冒气。',
+    extraEvents: ['ev_zao_second', 'ev_zao_spice'],
     unlockAfter: 'river',
     nodes: [
       { id: 'zao_0', type: 'event', title: '早市蒸汽', desc: '蒸笼一起掀盖，白汽把巷子蒸亮。', eventId: 'ev_zao_steam' },
@@ -306,6 +400,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
     bossId: 'br_boss',
     landmark: '拱桥与锁链',
     blurb: '工坊建在桥洞里。每次涨潮，桥影都会把路切成两半。',
+    extraEvents: ['ev_bridge_rivet', 'ev_bridge_blueprint'],
     unlockAfter: 'zao',
     nodes: [
       { id: 'bridge_0', type: 'event', title: '断桥', desc: '桥面断了一截，对面的灯还亮着。', eventId: 'ev_bridge_gap' },
@@ -323,6 +418,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
     bossId: 'sk_boss',
     landmark: '樱花树与档案柜',
     blurb: '山坡上的花每年只开一周，档案员会把每一招都记下来。',
+    extraEvents: ['ev_sakura_seed', 'ev_sakura_letter'],
     unlockAfter: 'bridge',
     nodes: [
       { id: 'sakura_0', type: 'event', title: '落樱', desc: '花瓣落得很慢。', eventId: 'ev_sakura_petal' },
@@ -340,6 +436,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
     bossId: 'th_boss',
     landmark: '线圈塔与主脑',
     blurb: '整座站靠一根没接地的电线供电，晚上会自己做梦。',
+    extraEvents: ['ev_thunder_battery', 'ev_thunder_blueprint'],
     unlockAfter: 'sakura',
     nodes: [
       { id: 'thunder_0', type: 'event', title: '跳闸', desc: '整座站突然断电。', eventId: 'ev_thunder_blackout' },
@@ -367,6 +464,9 @@ export function createRegionRun(regionId: RegionId, seed: string): RegionRunStat
     tokens: 0,
     completed: false,
     startResonance: 2,
+    startShield: 0,
+    bossHpDelta: 0,
+    flags: [],
     eventChoices: {},
     log: [`进入${region.name}：${region.blurb}`],
   };
@@ -378,7 +478,15 @@ export function currentNodeIndex(run: RegionRunState): number {
 }
 
 export function currentNode(run: RegionRunState) {
-  return getRegion(run.regionId).nodes[currentNodeIndex(run)];
+  const region = getRegion(run.regionId);
+  const node = region.nodes[currentNodeIndex(run)];
+  // 第二事件节点从额外事件池中按 seed 轮换，保证同一区域每周目事件不同
+  if (node.type === 'event' && node.id.endsWith('_2') && region.extraEvents?.length) {
+    const pool = [node.eventId, ...region.extraEvents].filter((id): id is string => Boolean(id));
+    const index = hashString(`${run.seed}|${node.id}`) % pool.length;
+    return { ...node, eventId: pool[index] };
+  }
+  return node;
 }
 
 export function getEvent(id: string | undefined): GameEvent | null {
@@ -401,10 +509,14 @@ export function applyEventChoice(run: RegionRunState, eventId: string, choiceId:
   if (!event || run.eventChoices[eventId]) return run;
   const choice = choiceById(event, choiceId);
   if (!choice) return run;
+  if (choice.requiresFlag && !run.flags.includes(choice.requiresFlag)) return run;
   const next: RegionRunState = {
     ...run,
     eventChoices: { ...run.eventChoices, [eventId]: choiceId },
     startResonance: run.startResonance,
+    startShield: run.startShield,
+    bossHpDelta: run.bossHpDelta,
+    flags: [...run.flags, ...(choice.flags ?? [])].filter((flag, index, list) => list.indexOf(flag) === index),
     materials: run.materials,
     tokens: run.tokens,
     log: [...run.log],
@@ -412,6 +524,10 @@ export function applyEventChoice(run: RegionRunState, eventId: string, choiceId:
   if (choice.effect.kind === 'runResonance') next.startResonance += choice.effect.amount;
   if (choice.effect.kind === 'materials') next.materials += choice.effect.amount;
   if (choice.effect.kind === 'tokens') next.tokens += choice.effect.amount;
+  if (choice.effect.kind === 'startShield') next.startShield = Math.min(30, next.startShield + choice.effect.amount);
+  if (choice.effect.kind === 'bossHp') next.bossHpDelta += choice.effect.amount;
+  if (choice.effect.kind === 'flag') next.flags.push(choice.effect.flag);
+  next.flags = [...new Set(next.flags)];
   next.log.push(`事件「${event.title}」：${choice.label}`);
   return next;
 }
@@ -458,4 +574,7 @@ export function computeUnlockedRegions(runs: Partial<Record<RegionId, RegionRunS
     return !region.unlockAfter || cleared.has(region.unlockAfter);
   });
 }
+
+
+
 

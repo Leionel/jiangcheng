@@ -3,14 +3,20 @@ import type {
   AnalyzeObjectIntent,
   BattleDirectorPlan,
   EnemyActionId,
+  EvolutionGuidePlan,
   FeatureEvidence,
+  QuestDirectorPlan,
   VisionLite,
 } from '../domain/types';
 import { isBuildPath, isTag } from '../domain/tags';
 
 export type AiLogEntry = {
   at: number;
-  endpoint: '/api/ai/analyze-object' | '/api/ai/battle-director';
+  endpoint:
+    | '/api/ai/analyze-object'
+    | '/api/ai/battle-director'
+    | '/api/ai/quest-director'
+    | '/api/ai/evolution-guide';
   mode: 'live_ai' | 'fallback' | 'demo';
   ok: boolean;
   latencyMs: number;
@@ -182,5 +188,105 @@ export async function battleDirector(
     const message = (error as Error).message ?? '未知错误';
     push({ endpoint: '/api/ai/battle-director', mode: 'fallback', ok: false, latencyMs: 0, note: message });
     return { mode: 'fallback', plan: null, model: '', latencyMs: 0, note: `AI 决策失败，规则接管：${message}` };
+  }
+}
+
+/* ---------------------------- quest_director ---------------------------- */
+
+export type QuestDirectorResult = {
+  mode: 'live_ai' | 'fallback' | 'demo';
+  plan: QuestDirectorPlan | null;
+  model: string;
+  latencyMs: number;
+  note: string;
+};
+
+export async function questDirector(
+  payload: {
+    region: string;
+    quests: Array<{ id: string; title: string; desc: string; progress: number; target: number }>;
+    party: Array<{ name: string; buildPath: string; level: number }>;
+    materials: number;
+    tokens: number;
+    bond: string;
+  },
+  legalIds: string[],
+  options: { preferLive: boolean; timeoutMs?: number } = { preferLive: false },
+): Promise<QuestDirectorResult> {
+  if (!options.preferLive) {
+    return { mode: 'demo', plan: null, model: '', latencyMs: 0, note: '规则推荐（演示模式）' };
+  }
+  const health = await getHealth();
+  if (!health.aiAvailable) return { mode: 'demo', plan: null, model: '', latencyMs: 0, note: '规则推荐（无可用模型 Key）' };
+  try {
+    const response = await postJson<{
+      mode?: string;
+      plan?: { questId?: string; reason?: string; hint?: string };
+      meta?: { model?: string; latencyMs?: number; note?: string };
+    }>('/api/ai/quest-director', payload, options.timeoutMs ?? 6000);
+    if (!response.ok || !response.json?.plan) throw new Error(`HTTP ${response.status}`);
+    const questId = response.json.plan.questId;
+    if (!questId || !legalIds.includes(questId)) throw new Error('模型选择了不合法任务');
+    const plan: QuestDirectorPlan = {
+      questId,
+      reason: (response.json.plan.reason ?? '按当前进度推荐').replace(/[<>]/g, '').slice(0, 48),
+      hint: (response.json.plan.hint ?? '').replace(/[<>]/g, '').slice(0, 48),
+    };
+    const latencyMs = response.json.meta?.latencyMs ?? response.latencyMs;
+    push({ endpoint: '/api/ai/quest-director', mode: 'live_ai', ok: true, latencyMs, note: `${response.json.meta?.model ?? 'model'} · ${plan.reason}` });
+    return { mode: 'live_ai', plan, model: response.json.meta?.model ?? 'model', latencyMs, note: response.json.meta?.note ?? 'AI 任务推荐' };
+  } catch (error) {
+    const message = (error as Error).message ?? '未知错误';
+    push({ endpoint: '/api/ai/quest-director', mode: 'fallback', ok: false, latencyMs: 0, note: message });
+    return { mode: 'fallback', plan: null, model: '', latencyMs: 0, note: `AI 推荐失败，规则接管：${message}` };
+  }
+}
+
+/* --------------------------- evolution_guide --------------------------- */
+
+export type EvolutionGuideResult = {
+  mode: 'live_ai' | 'fallback' | 'demo';
+  plan: EvolutionGuidePlan | null;
+  model: string;
+  latencyMs: number;
+  note: string;
+};
+
+export async function evolutionGuide(
+  payload: {
+    creature: { name: string; level: number; buildPath: string; stats: { hp: number; atk: number; def: number; spd: number } };
+    branches: Array<{ id: string; name: string; path: string; desc: string; statBonus: Record<string, number> }>;
+    party: Array<{ name: string; buildPath: string; level: number }>;
+    region: string;
+  },
+  legalBranchIds: string[],
+  options: { preferLive: boolean; timeoutMs?: number } = { preferLive: false },
+): Promise<EvolutionGuideResult> {
+  if (!options.preferLive) {
+    return { mode: 'demo', plan: null, model: '', latencyMs: 0, note: '规则推荐（演示模式）' };
+  }
+  const health = await getHealth();
+  if (!health.aiAvailable) return { mode: 'demo', plan: null, model: '', latencyMs: 0, note: '规则推荐（无可用模型 Key）' };
+  try {
+    const response = await postJson<{
+      mode?: string;
+      plan?: { branchId?: string; reason?: string; warning?: string };
+      meta?: { model?: string; latencyMs?: number; note?: string };
+    }>('/api/ai/evolution-guide', payload, options.timeoutMs ?? 6000);
+    if (!response.ok || !response.json?.plan) throw new Error(`HTTP ${response.status}`);
+    const branchId = response.json.plan.branchId;
+    if (!branchId || !legalBranchIds.includes(branchId)) throw new Error('模型选择了不合法进化分支');
+    const plan: EvolutionGuidePlan = {
+      branchId,
+      reason: (response.json.plan.reason ?? '按队伍需要推荐').replace(/[<>]/g, '').slice(0, 56),
+      warning: (response.json.plan.warning ?? '').replace(/[<>]/g, '').slice(0, 56),
+    };
+    const latencyMs = response.json.meta?.latencyMs ?? response.latencyMs;
+    push({ endpoint: '/api/ai/evolution-guide', mode: 'live_ai', ok: true, latencyMs, note: `${response.json.meta?.model ?? 'model'} · ${plan.reason}` });
+    return { mode: 'live_ai', plan, model: response.json.meta?.model ?? 'model', latencyMs, note: response.json.meta?.note ?? 'AI 进化建议' };
+  } catch (error) {
+    const message = (error as Error).message ?? '未知错误';
+    push({ endpoint: '/api/ai/evolution-guide', mode: 'fallback', ok: false, latencyMs: 0, note: message });
+    return { mode: 'fallback', plan: null, model: '', latencyMs: 0, note: `AI 建议失败，规则接管：${message}` };
   }
 }

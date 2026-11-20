@@ -273,7 +273,6 @@ export type ExpeditionBattleState = {
   rewards: { materials: number; tokens: number };
   fingerprint: string;
 };
-
 export type BattleRewards = { materials: number; tokens: number };
 
 /* -------------------------------- 区域 --------------------------------- */
@@ -285,11 +284,17 @@ export type EventChoice = {
   id: string;
   label: string;
   desc: string;
+  requiresFlag?: string;
+  /** 选择后写入 run.flags，作为后续事件/战斗的持久影响 */
+  flags?: string[];
   effect:
     | { kind: 'runResonance'; amount: number }
     | { kind: 'materials'; amount: number }
     | { kind: 'tokens'; amount: number }
     | { kind: 'bond'; amount: number }
+    | { kind: 'startShield'; amount: number }
+    | { kind: 'bossHp'; amount: number }
+    | { kind: 'flag'; flag: string }
     | { kind: 'none' };
 };
 
@@ -320,6 +325,8 @@ export type RegionDef = {
   unlockAfter?: RegionId;
   landmark: string;
   blurb: string;
+  /** 额外事件池：第二事件节点按 seed 轮换，提供 20 个事件的内容量 */
+  extraEvents?: string[];
 };
 
 export type RegionRunState = {
@@ -330,6 +337,10 @@ export type RegionRunState = {
   tokens: number;
   completed: boolean;
   startResonance: number;
+  /** Batch 2：事件留下的长期影响 */
+  startShield: number;
+  bossHpDelta: number;
+  flags: string[];
   eventChoices: Record<string, string>;
   log: string[];
 };
@@ -342,6 +353,7 @@ export type LegacyCard = {
   element: string;
   createdAt: number;
   sourceKey: 'jcm.gallery.v1';
+  awakenedId?: string;
 };
 
 export type SaveV2 = {
@@ -426,6 +438,18 @@ export type BattleDirectorPlan = {
   actionId: EnemyActionId;
   reason: string;
   taunt: string;
+};
+
+export type QuestDirectorPlan = {
+  questId: string;
+  reason: string;
+  hint: string;
+};
+
+export type EvolutionGuidePlan = {
+  branchId: string;
+  reason: string;
+  warning: string;
 };
 
 export type CreatureBuildInput = {

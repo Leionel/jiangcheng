@@ -21,6 +21,7 @@ import {
   setEquipped,
   startRegionRun,
   toggleLock,
+  awakenLegacyCard,
 } from './domain/save';
 import { applyEventChoice, advanceEventNode, completeNode, currentNode, getEnemy, getRegion, REGIONS } from './domain/region';
 import {
@@ -32,7 +33,7 @@ import {
   resolveRound,
 } from './domain/battle2';
 import { V2_SAMPLES, sampleIdentity } from './content/samples';
-import { analyzeObject, battleDirector } from './ai/gateway';
+import { analyzeObject, battleDirector, evolutionGuide, questDirector } from './ai/gateway';
 import { getHealth, type HealthInfo } from '../shared/ai/client';
 import { inspectImageFile } from '../features/monsters/analyze';
 import { CATEGORY_TO_ELEMENT } from '../features/monsters/elements';
@@ -42,8 +43,9 @@ import { CaptureView2, type CaptureDraft } from './views/CaptureView2';
 import { BattleView2 } from './views/BattleView2';
 import { BattleResult, CodexView, PartyWorkshop, QuestPanel, RegionMap } from './views/Panels';
 import { branchesFor, evolutionGroupFor, previewEvolution } from './domain/evolution';
+import { GuideDrawer, NextStepBar } from './views/Guide';
 import { grantXp } from './domain/growth';
-import { claimQuest, QUEST_BY_ID } from './domain/quests';
+import { claimQuest, QUEST_BY_ID, QUEST_DEFS, questState } from './domain/quests';
 import { buildChallengeCode } from './domain/challenge';
 import type { EnemyDef, PlayerMainAction, PlayerSupportAction, RegionNodeDef } from './domain/types';
 import './styles/v2.css';
@@ -72,6 +74,12 @@ export function V2App() {
   const [toast, setToast] = useState<string | null>(null);
   const [selectedRegionId, setSelectedRegionId] = useState<RegionId>(() => loadSave().activeRegionId);
   const [evolveId, setEvolveId] = useState<string | null>(null);
+  const [questHint, setQuestHint] = useState('');
+  const [questPlanning, setQuestPlanning] = useState(false);
+  const [evoGuide, setEvoGuide] = useState('');
+  const [evoRecommendedId, setEvoRecommendedId] = useState('');
+  const [evoPlanning, setEvoPlanning] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const resultRef = useRef(false);
 
   const activeRun = getActiveRun(save);
@@ -320,6 +328,8 @@ export function V2App() {
         startResonance: activeRun.startResonance,
         activeIndex: save.party.activeIndex,
         bondLevel: bondLevelOf(save),
+        startShield: activeRun.startShield,
+        bossHpDelta: activeRun.bossHpDelta,
       });
       resultRef.current = false;
       setBattle(next);
@@ -513,7 +523,84 @@ export function V2App() {
 
   const openEvolution = useCallback((id: string) => {
     setEvolveId(id);
+    setEvoGuide('');
+    setEvoRecommendedId('');
   }, []);
+
+  const handleQuestAi = useCallback(async () => {
+    const active = QUEST_DEFS.filter((quest) => ['active', 'complete'].includes(questState(quest, save)));
+    if (active.length === 0) {
+      showToast('现在没有可推荐的任务');
+      return;
+    }
+    setQuestPlanning(true);
+    try {
+      const result = await questDirector(
+        {
+          region: activeRun ? getRegion(activeRun.regionId).name : '江城',
+          quests: active.map((quest) => ({
+            id: quest.id,
+            title: quest.title,
+            desc: quest.desc,
+            progress: Math.min(quest.target, quest.progress(save)),
+            target: quest.target,
+          })),
+          party: save.party.ids
+            .map((id) => save.collection.find((item) => item.id === id))
+            .filter((item): item is NonNullable<typeof item> => Boolean(item))
+            .map((item) => ({ name: item.name, buildPath: item.buildPath, level: item.level })),
+          materials: save.materials,
+          tokens: save.tokens,
+          bond: bondLevelOf(save).toString(),
+        },
+        active.map((quest) => quest.id),
+        { preferLive, timeoutMs: 6000 },
+      );
+      const quest = result.plan ? QUEST_BY_ID.get(result.plan.questId) : null;
+      setQuestHint(
+        result.plan && quest
+          ? `推荐「${quest.title}」：${result.plan.reason}${result.plan.hint ? ` · ${result.plan.hint}` : ''}`
+          : result.note,
+      );
+    } finally {
+      setQuestPlanning(false);
+    }
+  }, [save, activeRun, preferLive, showToast]);
+
+  const handleEvolutionAi = useCallback(async () => {
+    if (!evolveCreatureData) return;
+    const branches = branchesFor(evolveCreatureData);
+    if (branches.length === 0) return;
+    setEvoPlanning(true);
+    try {
+      const result = await evolutionGuide(
+        {
+          creature: {
+            name: evolveCreatureData.name,
+            level: evolveCreatureData.level,
+            buildPath: evolveCreatureData.buildPath,
+            stats: evolveCreatureData.stats,
+          },
+          branches: branches.map((branch) => ({
+            id: branch.id,
+            name: branch.name,
+            path: branch.path,
+            desc: branch.desc,
+            statBonus: branch.statBonus as unknown as Record<string, number>,
+          })),
+          party: save.collection
+            .filter((item) => save.party.ids.includes(item.id))
+            .map((item) => ({ name: item.name, buildPath: item.buildPath, level: item.level })),
+          region: activeRun ? getRegion(activeRun.regionId).name : '江城',
+        },
+        branches.map((branch) => branch.id),
+        { preferLive, timeoutMs: 6000 },
+      );
+      setEvoGuide(result.plan ? `推荐「${branches.find((b) => b.id === result.plan!.branchId)?.name}」：${result.plan.reason}` : result.note);
+    } finally {
+      setEvoPlanning(false);
+    }
+  }, [evolveCreatureData, save, activeRun, preferLive]);
 
   const handleEvolve = useCallback(
     (branchId: string) => {
@@ -590,6 +677,19 @@ export function V2App() {
     void copy();
   }, [save, activeRun?.seed, showToast]);
 
+  const handleAwakenLegacy = useCallback(
+    (cardId: string) => {
+      const next = awakenLegacyCard(save, cardId);
+      if (next === save) {
+        showToast('这张旧卡已经觉醒过了');
+        return;
+      }
+      commit(next);
+      showToast('旧卡已觉醒为 2.0 造物，旧图鉴仍保留');
+    },
+    [save, commit, showToast],
+  );
+
   const toggleAiMode = useCallback(() => {
     const aiMode = save.settings.aiMode === 'auto' ? 'demo' : 'auto';
     commit({ ...save, settings: { ...save.settings, aiMode } });
@@ -625,6 +725,9 @@ export function V2App() {
           <span className="v2-stamp" data-tone={preferLive ? 'red' : 'blue'} title={health?.model ?? ''}>
             {health ? (preferLive ? '实时 AI 就绪' : '规则/演示模式') : '检测中'}
           </span>
+          <button type="button" className="v2-nav-tab" onClick={() => setGuideOpen(true)}>
+            指引
+          </button>
           <button type="button" className="v2-link-btn" onClick={toggleAiMode}>
             {save.settings.aiMode === 'auto' ? '切换演示模式' : '切换实时 AI'}
           </button>
@@ -635,6 +738,14 @@ export function V2App() {
       </header>
 
       <main className="v2-shell">
+        <NextStepBar
+          save={save}
+          onNavigate={(target) => {
+            setSelectedRegionId(save.activeRegionId);
+            setScreen(target);
+          }}
+          onOpenGuide={() => setGuideOpen(true)}
+        />
         <div className="v2-screen" key={screen}>
           {screen === 'capture' ? (
           <CaptureView2
@@ -685,7 +796,15 @@ export function V2App() {
           />
         ) : null}
 
-        {screen === 'quests' ? <QuestPanel save={save} onClaim={handleClaimQuest} /> : null}
+        {screen === 'quests' ? (
+          <QuestPanel
+            save={save}
+            onClaim={handleClaimQuest}
+            aiHint={questHint}
+            aiPlanning={questPlanning}
+            onAiRecommend={() => void handleQuestAi()}
+          />
+        ) : null}
 
         {screen === 'battle' && battle ? (
           <BattleView2
@@ -730,6 +849,7 @@ export function V2App() {
             onExport={handleExport}
             onImport={handleImport}
             onShare={handleShare}
+            onAwakenLegacy={handleAwakenLegacy}
           />
         ) : null}
         </div>
@@ -788,6 +908,15 @@ export function V2App() {
               <span><em>DEF</em><b>{evolveCreatureData.stats.def}</b></span>
               <span><em>SPD</em><b>{evolveCreatureData.stats.spd}</b></span>
             </div>
+            <div className="v2-guidance-bar">
+              <span className="v2-rubric">进化指引</span>
+              <p className="v2-lede">
+                {evoGuide || '两条分支会改变属性、技能与外观；先看队伍缺什么，再花信物。'}
+              </p>
+              <button type="button" className="v2-btn v2-btn-sm" onClick={handleEvolutionAi} disabled={evoPlanning}>
+                {evoPlanning ? 'AI 正在看…' : 'AI 推荐一条'}
+              </button>
+            </div>
             {evolveCreatureData.evolutionId ? (
               <div className="v2-evolve-current">
                 <p className="fineprint">回退会恢复进化前的属性、技能与配色，消耗 1 个信物。</p>
@@ -797,9 +926,11 @@ export function V2App() {
               <div className="v2-evolve-grid">
                 {branchesFor(evolveCreatureData).map((branch) => {
                   const preview = previewEvolution(evolveCreatureData, branch);
+                  const recommended = branch.id === evoRecommendedId || evoGuide.includes(`推荐「${branch.name}」`);
                   return (
-                    <div className="v2-evolve-card" key={branch.id}>
+                    <div className="v2-evolve-card" key={branch.id} data-recommended={recommended}>
                       <span className="v2-badge" data-kind="path">{PATH_LABEL[branch.path]}</span>
+                      {recommended ? <span className="v2-badge" data-kind="ai">AI 推荐</span> : null}
                       <b>{preview.name}</b>
                       <p className="fineprint">{preview.desc}</p>
                       <div className="v2-specimen-stats">
@@ -827,6 +958,7 @@ export function V2App() {
         </div>
       ) : null}
 
+      <GuideDrawer open={guideOpen} onClose={() => setGuideOpen(false)} />
       {toast ? <div className="v2-toast">{toast}</div> : null}
     </div>
   );
@@ -839,6 +971,9 @@ const PATH_LABEL: Record<BuildPath, string> = {
   support: '支援',
   mover: '机动',
 };
+
+
+
 
 
 

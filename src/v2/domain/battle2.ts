@@ -184,10 +184,17 @@ export function createExpeditionBattle(input: {
   startResonance?: number;
   maxRounds?: number;
   bondLevel?: number;
+  /** 事件带来的开局护盾/Boss 削弱 */
+  startShield?: number;
+  bossHpDelta?: number;
 }): ExpeditionBattleState {
   if (input.team.length !== 3) throw new Error('expedition_v2 需要 3 人队伍');
   const enemy = createEnemyState(input.enemy);
+  if (input.bossHpDelta) enemy.hp = Math.max(1, enemy.hp + input.bossHpDelta);
   const team = input.team.map(makeCreatureState);
+  if (input.startShield && input.startShield > 0) {
+    for (const member of team) member.statuses = addStatus(member.statuses, 'shield', input.startShield, 3);
+  }
   const activeIndex = input.activeIndex ?? 0;
   const state: ExpeditionBattleState = {
     schemaVersion: 2,

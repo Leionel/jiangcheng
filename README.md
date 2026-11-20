@@ -26,10 +26,10 @@ npm run check:ai     # 真实模型：analyze / battle-plan / analyze-object / b
 - **物品语义编译器**：五维标签 + 看见/推断/我确认三源证据 + 3 次纠正，技能与数值全部由规则编译（预算 68–75）。
 - **三人队伍 + expedition_v2**：主战/支援、换位、支援指令、共鸣、状态、连携；纯函数、可复现。
 - **五区闭环**：江风渡口、过早巷、桥影工坊、樱语山坡、雷鸣创想站；每区独立 Boss 机制（暴雨/热度/封锁/记录/三阶段过载）。
-- **成长与长期进度**：等级 1–5、6 组进化 × 2 分支（预览/应用/回退）、羁绊 4 档 + 6 连携、12 个任务。
-- **AI 真实参与**：Boss/敌人每回合在合法行动中由模型选招，伤害/阶段/胜负仍由规则结算；失败自动回落并标注来源。
+- **成长与长期进度**：等级 1–5、10 组进化 × 2 分支（预览/应用/回退）、羁绊 4 档 + 6 连携、25 个任务、20 个事件与后续 flags。
+- **AI 真实参与**：P1 analyze/battle-plan + 2.0 analyze-object/battle-director/quest-director/evolution-guide 六条链路；只选合法项，失败自动回落并标注来源。
 - **江城全图**：1200×720 手绘观测图，五区可点击、路线/Boss 情报/区域规则；移动端竖向五区路线。另有艺术海报 `docs/art/jiangcheng-map-poster.png`。
-- **图鉴与分享**：三层图鉴、筛选、锁定保护；`JCM2-` 挑战码复制/解码；旧 `jcm.gallery.v1` 只读迁移。
+- **图鉴与分享**：三层图鉴、筛选、锁定保护；`JCM2-` 挑战码复制/解码；旧 `jcm.gallery.v1` 只读迁移，旧卡可“觉醒”为 2.0 造物。\n- **引导与卡片**：常驻「下一步」、六章指引抽屉、事件锁解释、AI 推荐理由；卡片毛玻璃 / 指针倾斜 / 流光 / 切换动效，reduced-motion 可关。\n- **服务端拆分**：`server/config.mjs`、`lib/http.mjs`、`lib/ai.mjs`、`routes/p1.mjs`、`routes/v2.mjs`。
 - **兼容**：旧版快斗、P1 测试与 10 步 E2E 保持通过。
 - 实施状态见 [`docs/JIANGCHENG_2_STATUS.md`](docs/JIANGCHENG_2_STATUS.md)；Batch 2–5 报告见 [`docs/JIANGCHENG_2_BATCH2_5_REPORT.md`](docs/JIANGCHENG_2_BATCH2_5_REPORT.md)。
 - 当前实施状态、偏差与 Batch 2 计划见 [`docs/JIANGCHENG_2_STATUS.md`](docs/JIANGCHENG_2_STATUS.md)。
@@ -55,7 +55,7 @@ npm run dev              # 5173，Vite 已代理 /api
 ```bash
 npm test                 # vitest：规则、边界、可复现、AI 降级、战术、战绩、平衡（37 条）
 npm run typecheck        # tsc --noEmit
-npm run check:ai         # 真实模型冒烟：analyze / battle-plan / analyze-object / battle-director（无 Key 会跳过并说明）
+npm run check:ai         # 真实模型冒烟：analyze / battle-plan / analyze-object / battle-director / quest-director / evolution-guide
 npm run shots            # 无头 Chrome 走完整流程 + 截图到 docs/shots/
 npm run shots:2          # 2.0 探索切片 E2E + 截图到 docs/shots-2/
 npm run shots:ui         # 2.0 UI 走查（桌面 1440 / 移动 390）
@@ -257,3 +257,4 @@ docs/shots/                    自动生成的分步截图
 - 图鉴上限 24 只，超出后最早一只被移除（未做「锁定收藏」）。
 - 移动端首页的示例大卡较高，需要滑动才能看到五个样本条。
 - `game.css` 末尾新增了「P1 增补」样式块，后续可合并去重。
+

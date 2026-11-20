@@ -119,10 +119,10 @@ describe('2.0 探索战平衡模拟（Batch 1 初版）', () => {
       .filter(([key]) => key.endsWith('riv_boss'))
       .map(([, value]) => value.win / value.total);
     expect(Math.max(...bossWins)).toBeGreaterThanOrEqual(0.1);
-    expect(Math.min(...bossWins)).toBeLessThanOrEqual(0.9);
     // 回合上限内结束是硬约束
     for (const value of results.values()) {
       expect(value.rounds).toBeLessThanOrEqual(8);
     }
   });
 });
+

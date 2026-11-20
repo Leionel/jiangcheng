@@ -9,6 +9,10 @@ const TAG_PRIORITY: Array<{ tags: string[]; group: string }> = [
   { tags: ['river', 'vehicle', 'propel'], group: 'ferry' },
   { tags: ['stationery', 'layered'], group: 'archive' },
   { tags: ['illuminate', 'invention'], group: 'lamp' },
+  { tags: ['hollow', 'liquid_like'], group: 'cup' },
+  { tags: ['textile', 'carry'], group: 'bag' },
+  { tags: ['bridge', 'connect'], group: 'bridge' },
+  { tags: ['rain'], group: 'rain' },
 ];
 
 export function evolutionGroupFor(creature: V2Creature): EvolutionGroup {
@@ -67,7 +71,8 @@ export function applyEvolution(creature: V2Creature, branch: EvolutionBranch): V
   if (!module) throw new Error('进化模块不存在');
   const actives = [branch.moduleId, ...creature.actives.filter((id) => id !== branch.moduleId)].slice(0, 3);
   const damage = damageModule({ ...creature, actives });
-  const equipped = [branch.moduleId, ...(damage && damage !== branch.moduleId ? [damage] : creature.equipped.filter((id) => id !== branch.moduleId))].slice(0, 2);
+  // 保证进化后仍有一个伤害技能在第一个装备位，避免“进化完只会放盾”
+  const equipped = (damage ? [damage, ...(branch.moduleId !== damage ? [branch.moduleId] : [])] : [branch.moduleId, ...creature.equipped]).slice(0, 2);
   return {
     ...creature,
     evolutionId: branch.id,

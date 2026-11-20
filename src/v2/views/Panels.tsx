@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import { useRef, useState } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import type { BuildPath, ExpeditionBattleState, RegionId, RegionRunState, SaveV2, V2Creature } from '../domain/types';
 import type { EnemyDef, RegionNodeDef } from '../domain/types';
 import { PATH_META, TAG_LABELS, tagDimension } from '../domain/tags';
@@ -46,8 +46,31 @@ export function CreatureMiniCard({
   tier?: string;
 }) {
   const passive = PASSIVE_BY_ID.get(creature.passiveId);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== 'mouse' || !cardRef.current) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width;
+    const y = (event.clientY - rect.top) / rect.height;
+    cardRef.current.style.setProperty('--card-rx', `${((0.5 - y) * 7).toFixed(2)}deg`);
+    cardRef.current.style.setProperty('--card-ry', `${((x - 0.5) * 8).toFixed(2)}deg`);
+    cardRef.current.style.setProperty('--card-mx', `${(x * 100).toFixed(1)}%`);
+    cardRef.current.style.setProperty('--card-my', `${(y * 100).toFixed(1)}%`);
+  };
+  const resetTilt = () => {
+    if (!cardRef.current) return;
+    cardRef.current.style.setProperty('--card-rx', '0deg');
+    cardRef.current.style.setProperty('--card-ry', '0deg');
+  };
   return (
-    <div className="v2-specimen" data-active={Boolean(active)}>
+    <div
+      className="v2-specimen"
+      data-active={Boolean(active)}
+      data-evolved={Boolean(creature.evolutionId)}
+      ref={cardRef}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={resetTilt}
+    >
       <div className="v2-specimen-body">
         <span className="v2-specimen-art">
           <MonsterSprite recipe={creature.visual} title={creature.name} />
@@ -97,6 +120,7 @@ export function CreatureMiniCard({
           </div>
         </div>
       </div>
+      <span className="v2-card-sheen" aria-hidden="true" />
       {action ? <div className="v2-specimen-actions">{action}</div> : null}
     </div>
   );
@@ -134,7 +158,7 @@ export function PartyWorkshop({
           <h2 className="v2-h2">主战一个，支援两个</h2>
           <p className="v2-lede">每回合一次主战行动加一次支援指令；换位消耗共鸣。支援位负责治疗、侦测、接力与连携。</p>
           <div className="v2-party-meta">
-            <span className="v2-badge" data-kind="resource">羁绊 · {bondLabel(save.bondPoints)}</span>
+            <span className="v2-badge" data-kind="resource" title="一起战斗会积累羁绊；羁绊越高，越高级的连携会解锁">羁绊 · {bondLabel(save.bondPoints)}</span>
             <span className="fineprint">一起战斗积累羁绊，解锁第 3–6 条连携</span>
           </div>
         </div>
@@ -370,12 +394,22 @@ export function RegionMap({
                 <h3 className="v2-h3">{node.title}</h3>
                 <p className="v2-lede">{event.text}</p>
                 <div className="v2-event-choices">
-                  {event.choices.map((choice) => (
-                    <button type="button" className="v2-choice" key={choice.id} onClick={() => onChooseEvent(event.id, choice.id)}>
-                      <b>{choice.label}</b>
-                      <span>{choice.desc}</span>
-                    </button>
-                  ))}
+                  {event.choices.map((choice) => {
+                    const lockedChoice = Boolean(choice.requiresFlag && !(run?.flags ?? []).includes(choice.requiresFlag));
+                    return (
+                      <button
+                        type="button"
+                        className="v2-choice"
+                        key={choice.id}
+                        onClick={() => onChooseEvent(event.id, choice.id)}
+                        disabled={lockedChoice}
+                        title={lockedChoice ? `需要先留下「${choice.requiresFlag}」的线索` : choice.desc}
+                      >
+                        <b>{choice.label}</b>
+                        <span>{lockedChoice ? '还缺少前置线索' : choice.desc}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ) : enemy ? (
@@ -444,9 +478,15 @@ export function RegionMap({
 export function QuestPanel({
   save,
   onClaim,
+  aiHint,
+  aiPlanning,
+  onAiRecommend,
 }: {
   save: SaveV2;
   onClaim: (questId: string) => void;
+  aiHint: string;
+  aiPlanning: boolean;
+  onAiRecommend: () => void;
 }) {
   return (
     <section className="v2-panel">
@@ -458,8 +498,18 @@ export function QuestPanel({
         </div>
         <div className="v2-panel-actions">
           <span className="v2-badge" data-kind="resource">已完成 {completedQuestCount(save)} / {QUEST_DEFS.length}</span>
+          <button type="button" className="v2-btn v2-btn-sm" onClick={onAiRecommend} disabled={aiPlanning}>
+            {aiPlanning ? 'AI 正在看…' : 'AI 推荐下一步'}
+          </button>
         </div>
       </div>
+      {aiHint ? (
+        <div className="v2-guidance-bar">
+          <span className="v2-rubric">任务指引</span>
+          <p className="v2-lede">{aiHint}</p>
+          <span className="fineprint">只推荐合法任务；失败会自动回落到规则推荐。</span>
+        </div>
+      ) : null}
       <div className="v2-quest-grid">
         {QUEST_DEFS.map((quest) => {
           const state = questState(quest, save);
@@ -593,6 +643,7 @@ export function CodexView({
   onExport,
   onImport,
   onShare,
+  onAwakenLegacy,
 }: {
   save: SaveV2;
   preferLive: boolean;
@@ -604,6 +655,7 @@ export function CodexView({
   onExport: () => void;
   onImport: (text: string) => void;
   onShare: () => void;
+  onAwakenLegacy: (id: string) => void;
 }) {
   const locked = new Set(save.lockedIds);
   const [filter, setFilter] = useState<'all' | BuildPath>('all');
@@ -693,7 +745,14 @@ export function CodexView({
           ) : (
             <div className="v2-legacy-list">
               {save.legacyCards.map((card) => (
-                <span className="v2-mini-tag" key={card.id} data-kind="legacy">{card.name} · {card.element}</span>
+                <span className="v2-mini-tag" key={card.id} data-kind="legacy">
+                  {card.name} · {card.element}
+                  {card.awakenedId ? (
+                    <em>已觉醒</em>
+                  ) : (
+                    <button type="button" className="v2-legacy-awaken" onClick={() => onAwakenLegacy(card.id)}>觉醒</button>
+                  )}
+                </span>
               ))}
             </div>
           )}
@@ -716,6 +775,8 @@ export function CodexView({
     </section>
   );
 }
+
+
 
 
 

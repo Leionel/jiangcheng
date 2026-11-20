@@ -75,11 +75,11 @@ export const ACTIVE_MODULES: ActiveModule[] = [
     id: 'A07',
     name: '余温冲刺',
     kind: 'attack',
-    power: 18,
+    power: 22,
     cost: 1,
     cooldown: 1,
     tags: ['food', 'nourish', 'street_food'],
-    effect: { kind: 'damage', power: 18 },
+    effect: { kind: 'damage', power: 22 },
     text: '稳定的一击，命中后积累 1 点共鸣。',
   },
   {
@@ -163,11 +163,11 @@ export const ACTIVE_MODULES: ActiveModule[] = [
     id: 'A15',
     name: '伞骨突刺',
     kind: 'attack',
-    power: 16,
+    power: 18,
     cost: 1,
     cooldown: 1,
     tags: ['tool', 'protect', 'foldable', 'rigid'],
-    effect: { kind: 'damage', power: 16 },
+    effect: { kind: 'damage', power: 18 },
     text: '用骨架稳定地戳一下：伤害不高，但不依赖属性克制。',
   },
   {
@@ -359,3 +359,5 @@ export const LINK_BY_ID = new Map(LINKS.map((link) => [link.id, link]));
 export function moduleTags(moduleId: string): string[] {
   return ACTIVE_BY_ID.get(moduleId)?.tags ?? [];
 }
+
+

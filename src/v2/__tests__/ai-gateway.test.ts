@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { analyzeObject, battleDirector, v2AiLog } from '../ai/gateway';
+import { analyzeObject, battleDirector, evolutionGuide, questDirector, v2AiLog } from '../ai/gateway';
 import { resetHealthCache } from '../../shared/ai/client';
 import type { EnemyActionId, VisionLite } from '../domain/types';
 
@@ -137,5 +137,64 @@ describe('2.0 AI 网关：合法性与降级', () => {
     expect(result.mode).toBe('live_ai');
     expect(result.plan?.actionId).toBe('storm');
     expect(result.plan?.reason).toContain('暴雨');
+  });
+
+  it('quest-director 只接受合法任务；非法任务降级', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        String(url).includes('/api/health')
+          ? jsonResponse({ ok: true, ai: { available: true, model: 'mock-model' } })
+          : jsonResponse({
+              mode: 'live_ai',
+              plan: { questId: 'q_hack', reason: '偷一个不存在的任务', hint: '不存在的任务' },
+              meta: { model: 'mock-model', latencyMs: 8, requestId: 'q1' },
+            }),
+      ),
+    );
+    const result = await questDirector(
+      {
+        region: '江风渡口',
+        quests: [{ id: 'q_first_win', title: '第一场胜仗', desc: '赢一场', progress: 1, target: 1 }],
+        party: [{ name: '伞团团', buildPath: 'guardian', level: 2 }],
+        materials: 2,
+        tokens: 1,
+        bond: '初识',
+      },
+      ['q_first_win'],
+      { preferLive: true },
+    );
+    expect(result.mode).toBe('fallback');
+    expect(result.plan).toBeNull();
+  });
+
+  it('evolution-guide 只接受合法分支；合法分支返回 live_ai', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        String(url).includes('/api/health')
+          ? jsonResponse({ ok: true, ai: { available: true, model: 'mock-model' } })
+          : jsonResponse({
+              mode: 'live_ai',
+              plan: { branchId: 'umbrella_guard', reason: '队伍缺前排', warning: '会降低输出' },
+              meta: { model: 'mock-model', latencyMs: 8, requestId: 'e1' },
+            }),
+      ),
+    );
+    const result = await evolutionGuide(
+      {
+        creature: { name: '伞团团', level: 3, buildPath: 'guardian', stats: { hp: 90, atk: 24, def: 16, spd: 10 } },
+        branches: [
+          { id: 'umbrella_guard', name: '伞骨卫士', path: 'guardian', desc: '更厚', statBonus: { hp: 14 } },
+          { id: 'umbrella_striker', name: '雨幕刺客', path: 'striker', desc: '更快', statBonus: { atk: 4 } },
+        ],
+        party: [{ name: '面咕噜', buildPath: 'trickster', level: 2 }],
+        region: '江风渡口',
+      },
+      ['umbrella_guard', 'umbrella_striker'],
+      { preferLive: true },
+    );
+    expect(result.mode).toBe('live_ai');
+    expect(result.plan?.branchId).toBe('umbrella_guard');
   });
 });

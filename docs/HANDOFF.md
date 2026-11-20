@@ -11,7 +11,7 @@
 | 代码量 | 约 9.5k 行（含 CSS 2.5k、测试 900+、服务端 620） |
 | 技术栈 | React 18 + Vite 5 + TypeScript + zod + vitest；服务端零依赖 Node |
 | 模型 | 武大 MaaS `https://maas.whu.edu.cn/v1` · `deepseek-v4-flash`（已实测可读图，延迟 1.2–18.4s；可用于敌方选招） |
-| 状态 | P1 完成；2.0 Batch 2–5 五区闭环可玩（`?v2=1`）；**85 条测试全绿（v1 38 + v2 47）**；无 git 远程仓库（已建立本地基线） |
+| 状态 | P1 完成；2.0 Batch 2–5 五区闭环可玩（`?v2=1`）；**95 条测试全绿（v1 38 + v2 57）**；无 git 远程仓库（已建立本地基线） |
 | P1 文档 | `docs/P1-AUDIT.md`（审计）/ `docs/P1-PLAN.md`（任务清单）/ `docs/P1-RESULT.md`（实施结果） |
 | 2.0 文档 | 六份规划 + `docs/JIANGCHENG_2_STATUS.md` / `docs/JIANGCHENG_2_UI_PASS.md` / `docs/JIANGCHENG_2_BATCH2_5_REPORT.md` |
 | 艺术资产 | `docs/art/jiangcheng-map-poster.png`（手绘五区观测图）+ `docs/art/WET_INK_CARTOGRAPHY.md` |
@@ -277,3 +277,4 @@ E2E 的 10 个步骤：首页 → 显影弹窗 → 卡面（断言战术 3 项�
 - 原始规格：上级目录 `珞珈AI创意_三原型可玩性验证与开发规格书.md`
 
 接手第一小时的建议动作：读第 3 节 → 跑 `npm test` 看平衡表 → 跑 `npm run check:ai` 确认真实模型链路 → 跑 `npm run shots` 看 10 张图 → 从第 8 节的第 1 项开始。
+

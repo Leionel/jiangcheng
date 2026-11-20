@@ -34,6 +34,10 @@ describe('Batch 2：任务系统', () => {
     expect(questState(qRiver, afterRiver)).toBe('complete');
     const claimed = claimQuest(afterRiver, qRiver.id);
     expect(questState(QUEST_BY_ID.get('q_zao_clear')!, claimed)).toBe('active');
-    expect(QUEST_DEFS.length).toBeGreaterThanOrEqual(12);
+    expect(QUEST_DEFS.length).toBe(25);
+    expect(questState(QUEST_BY_ID.get('q_events_10')!, claimed)).toBe('locked');
   });
 });
+
+
+

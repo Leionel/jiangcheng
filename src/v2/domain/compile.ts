@@ -15,18 +15,18 @@ import type {
 
 /** 五条 build path 的初始数值底盘（预算 68–75，见 BALANCE_AND_ACCEPTANCE §1.2） */
 const PATH_STATS: Record<BuildPath, CreatureStats> = {
-  guardian: { hp: 90, atk: 24, def: 16, spd: 10 },
+  guardian: { hp: 90, atk: 26, def: 16, spd: 10 },
   striker: { hp: 74, atk: 32, def: 10, spd: 15 },
   trickster: { hp: 72, atk: 28, def: 9, spd: 18 },
-  support: { hp: 84, atk: 24, def: 15, spd: 13 },
+  support: { hp: 86, atk: 27, def: 15, spd: 13 },
   mover: { hp: 78, atk: 26, def: 11, spd: 17 },
 };
 
 const PATH_ACTIVE_POOL: Record<BuildPath, string[]> = {
-  guardian: ['A01', 'A08', 'A15', 'A13', 'A17', 'A20', 'A24'],
+  guardian: ['A07', 'A01', 'A15', 'A17', 'A08', 'A13', 'A20'],
   striker: ['A10', 'A07', 'A16', 'A21', 'A05', 'A04'],
   trickster: ['A02', 'A18', 'A22', 'A04', 'A09', 'A11'],
-  support: ['A12', 'A19', 'A23', 'A06', 'A15', 'A08'],
+  support: ['A07', 'A12', 'A19', 'A23', 'A06', 'A15', 'A08'],
   mover: ['A03', 'A16', 'A24', 'A11', 'A05', 'A07'],
 };
 
@@ -241,3 +241,6 @@ export function evidenceTagSet(evidence: FeatureEvidence[]): Set<string> {
 export function pathScoreFor(evidence: FeatureEvidence[], path: BuildPath): number {
   return pathScore(evidence, path);
 }
+
+
+

@@ -289,6 +289,10 @@ try {
   await clickText('图鉴', '.v2-nav-tab');
   await waitFor('.v2-codex-grid');
   await shot('10-v2-codex');
+  await clickText('指引', '.v2-nav-tab');
+  await waitFor('.v2-guide-panel');
+  await shot('22-v2-guide');
+  await clickText('关闭', '.v2-btn');
   const codexText = await evaluate(`(document.querySelector('.v2-panel')?.textContent || '')`);
   if (!/只/.test(codexText)) errors.push('图鉴没有显示造物数量');
 
@@ -403,6 +407,11 @@ try {
   if (!claimed) console.warn('  注意：第一场胜仗任务不在可领取状态');
   await sleep(400);
   await shot('17-v2-quests');
+  if (health?.ai?.available) {
+    await clickText('AI 推荐下一步', '.v2-btn');
+    await waitFor('.v2-guidance-bar', 12000);
+    await shot('23-v2-quest-ai');
+  }
   const questStore = await evaluate(`(() => {
     const raw = localStorage.getItem('jcm.v2.save');
     if (!raw) return null;
@@ -430,6 +439,10 @@ try {
   await waitFor('.v2-party-slots');
   await clickText('成长', '.v2-btn');
   await waitFor('.v2-evolve-panel');
+  if (health?.ai?.available) {
+    await clickText('AI 推荐一条', '.v2-btn');
+    await waitFor('.v2-evolve-card[data-recommended="true"]', 12000).catch(() => console.warn('  注意：进化 AI 未返回推荐'));
+  }
   await shot('18-v2-evolve');
   const evolved = await evaluate(`(() => {
     const button = [...document.querySelectorAll('.v2-evolve-card button')].find((node) => !node.disabled);

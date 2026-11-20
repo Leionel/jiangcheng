@@ -16,7 +16,7 @@ function level3Creature(sampleId = 'yusan'): V2Creature {
 
 describe('Batch 2：六组进化', () => {
   it('六组、每组两条分支、模块全部在白名单内', () => {
-    expect(EVOLUTION_GROUPS).toHaveLength(6);
+    expect(EVOLUTION_GROUPS).toHaveLength(10);
     for (const group of EVOLUTION_GROUPS) {
       expect(group.branches).toHaveLength(2);
       for (const branch of group.branches) {
@@ -61,3 +61,4 @@ describe('Batch 2：六组进化', () => {
     expect(reverted.collection[0].evolutionId).toBeUndefined();
   });
 });
+

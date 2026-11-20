@@ -165,6 +165,11 @@ export function BattleView2({
           </button>
         </div>
       </div>
+      {battle.round === 1 ? (
+        <p className="v2-coach">
+          先读「下一步意图」，再选行动：带护盾/防御时范围伤害减半；技能冷却或共鸣不足时用普通攻击。
+        </p>
+      ) : null}
 
       <div className="v2-battle-stage">
         {roundFlash ? (

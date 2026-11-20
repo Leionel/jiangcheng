@@ -1,9 +1,11 @@
 import type { Monster } from '../../shared/types';
+import type { Category, Element, VisionSummary } from '../../shared/types';
 import { hashString } from '../../shared/rng';
 import { ACTIVE_BY_ID, PASSIVE_BY_ID, SUPPORT_BY_ID } from '../content/modules';
 import { EVOLUTION_BY_ID } from '../content/evolutions';
 import { V2_SAMPLES, STARTER_SAMPLE_IDS, getSample } from '../content/samples';
 import { compileCreature } from './compile';
+import { inferTags, recommendPaths } from './tags';
 import { applyEvolution, branchById, revertEvolution } from './evolution';
 import { addBondXp, bondLevel, bondXpForBattle } from './bonds';
 import { battleXp, grantXp } from './growth';
@@ -146,6 +148,7 @@ function sanitizeLegacyCards(raw: unknown): LegacyCard[] {
       element: typeof item.element === 'string' ? item.element : 'tool',
       createdAt: typeof item.createdAt === 'number' ? item.createdAt : Date.now(),
       sourceKey: LEGACY_KEY,
+      ...(typeof (item as unknown as LegacyCard).awakenedId === 'string' ? { awakenedId: (item as unknown as LegacyCard).awakenedId } : {}),
     }));
 }
 
@@ -161,6 +164,9 @@ function sanitizeRun(raw: unknown): RegionRunState | null {
     tokens: isFiniteInt(run.tokens, 0, 9999) ? run.tokens : 0,
     completed: Boolean(run.completed),
     startResonance: isFiniteInt(run.startResonance, 0, 6) ? run.startResonance : 2,
+    startShield: isFiniteInt(run.startShield, 0, 30) ? run.startShield : 0,
+    bossHpDelta: isFiniteInt(run.bossHpDelta, -60, 0) ? run.bossHpDelta : 0,
+    flags: Array.isArray(run.flags) ? run.flags.filter((flag): flag is string => typeof flag === 'string').slice(0, 30) : [],
     eventChoices: run.eventChoices && typeof run.eventChoices === 'object' ? run.eventChoices : {},
     log: Array.isArray(run.log) ? run.log.filter((line): line is string => typeof line === 'string').slice(-20) : [],
   };
@@ -481,6 +487,57 @@ export function bondLevelOf(save: SaveV2): number {
   return bondLevel(save.bondPoints);
 }
 
+const ELEMENT_TO_CATEGORY: Record<Element, Category> = {
+  food: 'food',
+  water: 'water',
+  nature: 'nature',
+  structure: 'building',
+  tool: 'everyday',
+};
+
+const ELEMENT_COLORS: Record<Element, [string, string, string]> = {
+  food: ['#C9822F', '#F2D9A6', '#5A3A1E'],
+  water: ['#1B4E75', '#8FB6C6', '#D9DEE6'],
+  nature: ['#D4798F', '#F2E6C9', '#7A4A5A'],
+  structure: ['#6B5B4E', '#E8E2D2', '#3B3A33'],
+  tool: ['#3B4A63', '#8FA3B8', '#D9DEE6'],
+};
+
+/** v1 卡“觉醒”为 2.0 造物：只读旧卡保留，新造物另存；同一旧卡只觉醒一次 */
+export function awakenLegacyCard(save: SaveV2, cardId: string): SaveV2 {
+  const card = save.legacyCards.find((item) => item.id === cardId);
+  if (!card || card.awakenedId) return save;
+  const element = (['food', 'water', 'nature', 'structure', 'tool'].includes(card.element) ? card.element : 'tool') as Element;
+  const category = ELEMENT_TO_CATEGORY[element];
+  const vision: VisionSummary = {
+    primaryObject: card.name,
+    category,
+    colors: ELEMENT_COLORS[element],
+    features: ['旧图鉴记忆', card.name.slice(0, 6)],
+    confidence: 'medium',
+  };
+  const evidence = inferTags(vision).map((item) => ({ ...item, source: 'vision_observed' as const }));
+  const path = recommendPaths(evidence)[0] ?? 'guardian';
+  const creature = compileCreature({
+    vision,
+    evidence,
+    buildPath: path,
+    element,
+    name: card.name,
+    flavor: `从 P1 图鉴里醒过来的旧回响；它记得自己叫过「${card.name}」。`,
+    source: 'legacy',
+    variant: hashString(`legacy-${card.id}`) % 97,
+    createdAt: Date.now(),
+  });
+  const withCreature = addCreature(save, { ...creature, legacyMonsterId: card.id });
+  return {
+    ...withCreature,
+    legacyCards: withCreature.legacyCards.map((item) =>
+      item.id === cardId ? { ...item, awakenedId: creature.id } : item,
+    ),
+  };
+}
+
 export function exportSave(save: SaveV2): string {
   return JSON.stringify({ ...save, exportedAt: Date.now() }, null, 2);
 }
@@ -496,3 +553,5 @@ export function importSave(text: string): SaveV2 | null {
 export function sampleCatalog(): typeof V2_SAMPLES {
   return V2_SAMPLES;
 }
+
+
