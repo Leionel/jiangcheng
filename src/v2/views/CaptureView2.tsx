@@ -192,11 +192,6 @@ export function CaptureView2({
           <button type="button" className="v2-btn v2-btn-primary" onClick={() => fileRef.current?.click()}>
             拍照 / 上传物品
           </button>
-          {featuredSample ? (
-            <button type="button" className="v2-btn" onClick={() => onPickSample(featuredSample)}>
-              先试玩「{featuredSample.label}」
-            </button>
-          ) : null}
           <button type="button" className="v2-pill" data-on={preferLive} onClick={onToggleLive} disabled={!aiAvailable}>
             {preferLive ? '实时 AI 开' : '本地识别'}
           </button>

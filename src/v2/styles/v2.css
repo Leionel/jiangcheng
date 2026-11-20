@@ -3341,40 +3341,46 @@
   transition: opacity 0.2s ease;
 }
 
+.v2-vignette[data-unlocked="false"] {
+  opacity: 0.45;
+}
+
 .v2-world-label {
   --region: var(--ink-soft);
   position: absolute;
   transform: translate(-50%, -50%);
   z-index: 4;
   display: grid;
-  gap: 0;
+  gap: 1px;
   justify-items: start;
   padding: 5px 9px;
   background: var(--paper-hi);
-  border: 1.5px solid color-mix(in srgb, var(--region) 65%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--region) 70%, transparent);
+  box-shadow: 2px 2px 0 rgba(20, 33, 43, 0.12);
   text-align: left;
   cursor: pointer;
   transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
 .v2-world-label:hover {
-  transform: translate(-50%, -52%);
+  transform: translate(-50%, -53%);
   border-color: var(--region);
+  box-shadow: 3px 3px 0 rgba(20, 33, 43, 0.18);
 }
 
 .v2-world-label[data-selected="true"] {
   border: 2.5px solid var(--riso-red);
   box-shadow: 3px 3px 0 var(--riso-red);
-  transform: translate(-50%, -52%);
+  transform: translate(-50%, -53%);
 }
 
 .v2-world-label-tag {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 800;
   color: var(--paper-hi);
   background: var(--riso-red);
   padding: 1px 5px;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
   line-height: 1.3;
 }
 
@@ -3396,8 +3402,26 @@
   }
 }
 
+/* 未解锁区域保持 100% 不透明纸张底色避免底图透字，仅淡化文字与虚线边框 */
 .v2-world-label[data-state="locked"] {
-  opacity: 0.55;
+  border: 1.5px dashed rgba(20, 33, 43, 0.42);
+  box-shadow: 2px 2px 0 rgba(20, 33, 43, 0.08);
+}
+
+.v2-world-label[data-state="locked"] .v2-world-label-name {
+  color: var(--ink-soft);
+}
+
+.v2-world-label[data-state="locked"] .v2-world-label-name i {
+  opacity: 0.45;
+}
+
+.v2-world-label[data-state="locked"] .v2-world-label-meta {
+  color: var(--ink-faint);
+}
+
+.v2-world-label[data-state="locked"] .v2-world-label-boss {
+  color: var(--ink-faint);
 }
 
 .v2-world-label[data-state="done"] {
@@ -3407,30 +3431,34 @@
 .v2-world-label-name {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   font-family: var(--font-display);
-  font-size: 19px;
+  font-size: 16.5px;
   font-weight: 800;
+  line-height: 1.15;
   color: var(--ink);
   white-space: nowrap;
 }
 
 .v2-world-label-name i {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   background: var(--region);
   flex: none;
 }
 
 .v2-world-label-meta {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--region);
   font-weight: 700;
+  line-height: 1.25;
 }
 
 .v2-world-label-boss {
-  font-size: 12.5px;
+  font-size: 11.5px;
   color: var(--ink-soft);
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .v2-world-label[data-selected="true"] .v2-world-label-meta {
@@ -4623,6 +4651,46 @@
 
 .v2-hero-cta-row .v2-btn {
   white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.v2-choice[data-tag-gated="true"] {
+  grid-column: 1 / -1;
+  min-height: 64px;
+  border-style: dashed;
+}
+
+.v2-swap-strip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.v2-support-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.v2-support-head {
+  flex-wrap: wrap;
+}
+
+.v2-support-btn {
+  min-height: 52px;
+  padding: 7px 10px;
+}
+
+.v2-battle-deck {
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1.05fr) minmax(0, 0.85fr);
+  grid-template-areas: "main sub log";
+}
+
+.v2-toast {
+  pointer-events: none;
+  box-shadow: 0 8px 20px rgba(20, 33, 43, 0.24);
 }
 
 .v2-rules-fold {
@@ -4786,10 +4854,6 @@
   align-items: baseline;
   gap: 8px;
   flex-wrap: wrap;
-}
-
-.v2-battle-deck {
-  grid-template-areas: "main sub log";
 }
 
 .v2-deck-main {

@@ -453,25 +453,30 @@ export function BattleView2({
             <span className="v2-rubric">可选附加 · 支援 / 连携 / 换位</span>
             <span className="fineprint">不占回合，点完再点主战招式</span>
           </div>
-          <div className="v2-support-row">
-            {swapActions.map((action) => {
-              const target = battle.team[action.targetIndex];
-              return (
-                <button
-                  type="button"
-                  className="v2-support-btn"
-                  key={`swap-${action.targetIndex}`}
-                  onClick={() => onMain(action)}
-                  disabled={Boolean(battle.outcome)}
-                >
-                  <span className="v2-support-head">
-                    <b>换位 · {target.creature.name}</b>
-                    <span className="v2-badge" data-kind="cost">共鸣 1</span>
-                  </span>
-                  <span>新主战获得 4 点护盾，旧主战回 4 HP。</span>
-                </button>
-              );
-            })}
+          {swapActions.length > 0 ? (
+            <div className="v2-swap-strip">
+              {swapActions.map((action) => {
+                const target = battle.team[action.targetIndex];
+                return (
+                  <button
+                    type="button"
+                    className="v2-support-btn v2-swap-btn"
+                    key={`swap-${action.targetIndex}`}
+                    onClick={() => onMain(action)}
+                    disabled={Boolean(battle.outcome)}
+                    title="换位：新主战获 4 护盾，旧主战回 4 HP"
+                  >
+                    <span className="v2-support-head">
+                      <b>换位 · {target.creature.name}</b>
+                      <span className="v2-badge" data-kind="cost">共鸣 1</span>
+                    </span>
+                    <span>换上获 4 护盾 · 旧主战回 4 HP</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+          <div className="v2-support-list">
             {supportActions.map((action) => {
               const isSupport = action.kind === 'support';
               const reserve = isSupport ? battle.team[action.reserveIndex] : null;

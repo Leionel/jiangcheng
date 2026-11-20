@@ -91,6 +91,7 @@ export function V2App() {
   const [evoPlanning, setEvoPlanning] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const resultRef = useRef(false);
+  const toastTimerRef = useRef<number | null>(null);
 
   const activeRun = getActiveRun(save);
   const preferLive = Boolean(health?.aiAvailable && save.settings.aiMode === 'auto');
@@ -103,8 +104,14 @@ export function V2App() {
   }, []);
 
   const showToast = useCallback((message: string) => {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current);
+    }
     setToast(message);
-    window.setTimeout(() => setToast(null), 2800);
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 2600);
   }, []);
 
   useEffect(() => {
@@ -275,6 +282,7 @@ export function V2App() {
     commit(nextSave);
     resultRef.current = false;
     setSummon(null);
+    setToast(null);
     setBattle(battleState);
     setSupport(null);
     setAiNote('');
@@ -392,6 +400,7 @@ export function V2App() {
         bossHpDelta: activeRun.bossHpDelta,
       });
       resultRef.current = false;
+      setToast(null);
       setBattle(next);
       setSupport(null);
       setAiNote('');
@@ -459,7 +468,7 @@ export function V2App() {
               })
             : prev,
         );
-        setAiNote(`AI 选招 · ${outcome.model || 'model'} · ${outcome.latencyMs}ms · ${outcome.plan.reason}`);
+        setAiNote(`AI 导演 · ${outcome.model || 'model'} · ${outcome.latencyMs}ms`);
       } else {
         setAiNote(outcome.note);
       }

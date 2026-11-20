@@ -211,6 +211,17 @@ describe('区域 run', () => {
     withLamp = promoteCreatureToLead(withLamp, lamp.id);
     expect(withLamp.party.ids[0]).toBe(lamp.id);
     expect(withLamp.party.ids).toHaveLength(3);
+
+    // 捕获同系样本（如雨伞）设为 1 号位时，优先替换同属性+倾向的初始宠（伞团团），保留不同倾向的渡江仔与面咕噜
+    const yusan = compileSample('yusan');
+    let withUmbrella = addCreature(createDefaultSave(1_700_000_000_000), yusan);
+    withUmbrella = promoteCreatureToLead(withUmbrella, yusan.id);
+    expect(withUmbrella.party.ids[0]).toBe(yusan.id);
+    expect(withUmbrella.party.ids).toHaveLength(3);
+    const partyPaths = withUmbrella.party.ids.map(
+      (id) => withUmbrella.collection.find((item) => item.id === id)?.buildPath,
+    );
+    expect(new Set(partyPaths).size).toBe(3);
     withLamp = startRegionRun(withLamp, 'river', 'lamp-seed');
     const bonusLight = chooseEventInSave(withLamp, 'ev_fog_lamp', 'light');
     expect(bonusLight.bonusTriggered).toBe(true);

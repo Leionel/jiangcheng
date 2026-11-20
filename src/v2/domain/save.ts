@@ -396,12 +396,25 @@ export function chooseEventInSave(
 
 /**
  * 首次捕获时将新召唤的造物设为 1 号位（主战），让玩家立即带它出战。
- * 已有队伍保留其余位置补位，不会超过 3 只上限。
+ * 若队里已有同原物样本（如默认伞团团与新捕雨伞），优先替换同型样本保留不同职业队友，不超 3 只上限。
  */
 export function promoteCreatureToLead(save: SaveV2, creatureId: string): SaveV2 {
-  if (!save.collection.some((item) => item.id === creatureId)) return save;
-  const rest = save.party.ids.filter((id) => id !== creatureId);
-  const ids = [creatureId, ...rest].slice(0, 3);
+  const target = save.collection.find((item) => item.id === creatureId);
+  if (!target) return save;
+  const restIds = save.party.ids.filter((id) => id !== creatureId);
+  if (restIds.length >= 3) {
+    const dupIndex = restIds.findIndex((id) => {
+      const member = save.collection.find((item) => item.id === id);
+      return member && member.element === target.element && member.buildPath === target.buildPath;
+    });
+    const pathDupIndex =
+      dupIndex >= 0
+        ? dupIndex
+        : restIds.findIndex((id) => save.collection.find((item) => item.id === id)?.buildPath === target.buildPath);
+    const dropIndex = pathDupIndex >= 0 ? pathDupIndex : restIds.length - 1;
+    restIds.splice(dropIndex, 1);
+  }
+  const ids = [creatureId, ...restIds].slice(0, 3);
   return {
     ...save,
     party: { ids, activeIndex: 0 },

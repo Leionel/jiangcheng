@@ -2,17 +2,17 @@ import type { CSSProperties } from 'react';
 import type { RegionId, SaveV2 } from '../domain/types';
 import { REGIONS, REGION_ORDER, getEnemy } from '../domain/region';
 
-const POS: Record<RegionId, { x: number; y: number; labelX: number; labelY: number }> = {
-  river: { x: 600, y: 390, labelX: 600, labelY: 200 },
-  zao: { x: 185, y: 150, labelX: 190, labelY: 56 },
-  bridge: { x: 255, y: 560, labelX: 295, labelY: 668 },
-  sakura: { x: 985, y: 160, labelX: 980, labelY: 56 },
-  thunder: { x: 965, y: 565, labelX: 965, labelY: 668 },
+const POS: Record<RegionId, { x: number; y: number; labelX: number; labelY: number; stemY: number }> = {
+  river: { x: 600, y: 392, labelX: 600, labelY: 162, stemY: 280 },
+  zao: { x: 185, y: 188, labelX: 185, labelY: 48, stemY: 100 },
+  bridge: { x: 255, y: 528, labelX: 225, labelY: 666, stemY: 612 },
+  sakura: { x: 985, y: 181, labelX: 985, labelY: 48, stemY: 96 },
+  thunder: { x: 965, y: 535, labelX: 965, labelY: 666, stemY: 622 },
 };
 
 function regionStatus(save: SaveV2, id: RegionId): { label: string; state: 'locked' | 'ready' | 'active' | 'done' } {
   const run = save.regionRuns[id];
-  if (run?.completed) return { label: '已观测', state: 'done' };
+  if (run?.completed) return { label: '✓ 已观测', state: 'done' };
   if (run) return { label: `进行中 ${Math.min(run.nodeIndex + 1, REGIONS[id].nodes.length)}/${REGIONS[id].nodes.length}`, state: 'active' };
   if (save.unlockedRegions.includes(id)) return { label: '可探索', state: 'ready' };
   return { label: '未解锁', state: 'locked' };
@@ -88,9 +88,14 @@ export function JiangchengMap({
           </g>
 
           {/* ================= 过早巷 ================= */}
-          <g className="v2-vignette" data-region="zao">
-            <ellipse cx="185" cy="170" rx="150" ry="105" fill="#c58b25" fillOpacity="0.13" />
-            <ellipse cx="185" cy="170" rx="150" ry="105" fill="none" stroke="#c58b25" strokeOpacity="0.5" strokeDasharray="8 7" />
+          <g
+            className="v2-vignette"
+            data-region="zao"
+            data-unlocked={save.unlockedRegions.includes('zao')}
+            transform="translate(0 18)"
+          >
+            <ellipse cx="185" cy="170" rx="146" ry="88" fill="#c58b25" fillOpacity="0.16" />
+            <ellipse cx="185" cy="170" rx="146" ry="88" fill="none" stroke="#c58b25" strokeOpacity="0.58" strokeDasharray="8 7" />
             <g stroke="#14212b" strokeWidth="2" fill="none" opacity="0.72">
               {/* 三个早点摊 */}
               <path d="M100 190 h54 v-24 h-54 z M100 166 l27 -18 l27 18" />
@@ -109,9 +114,14 @@ export function JiangchengMap({
           </g>
 
           {/* ================= 桥影工坊 ================= */}
-          <g className="v2-vignette" data-region="bridge">
-            <ellipse cx="255" cy="560" rx="145" ry="98" fill="#6b5b4e" fillOpacity="0.12" />
-            <ellipse cx="255" cy="560" rx="145" ry="98" fill="none" stroke="#6b5b4e" strokeOpacity="0.5" strokeDasharray="8 7" />
+          <g
+            className="v2-vignette"
+            data-region="bridge"
+            data-unlocked={save.unlockedRegions.includes('bridge')}
+            transform="translate(0 -32)"
+          >
+            <ellipse cx="255" cy="560" rx="142" ry="86" fill="#6b5b4e" fillOpacity="0.15" />
+            <ellipse cx="255" cy="560" rx="142" ry="86" fill="none" stroke="#6b5b4e" strokeOpacity="0.55" strokeDasharray="8 7" />
             <g stroke="#14212b" strokeWidth="2.4" fill="none" opacity="0.78">
               {/* 支流上的拱桥 */}
               <path d="M170 548 h168" />
@@ -134,9 +144,9 @@ export function JiangchengMap({
           </g>
 
           {/* ================= 江风渡口 ================= */}
-          <g className="v2-vignette" data-region="river">
-            <ellipse cx="600" cy="392" rx="190" ry="115" fill="#1b4e75" fillOpacity="0.12" />
-            <ellipse cx="600" cy="392" rx="190" ry="115" fill="none" stroke="#1b4e75" strokeOpacity="0.55" strokeDasharray="8 7" />
+          <g className="v2-vignette" data-region="river" data-unlocked={save.unlockedRegions.includes('river')}>
+            <ellipse cx="600" cy="392" rx="188" ry="110" fill="#1b4e75" fillOpacity="0.15" />
+            <ellipse cx="600" cy="392" rx="188" ry="110" fill="none" stroke="#1b4e75" strokeOpacity="0.6" strokeDasharray="8 7" />
             <g stroke="#14212b" strokeWidth="2.2" fill="none" opacity="0.8">
               {/* 信号塔 */}
               <path d="M548 388 l 2 -104 M 584 388 l -2 -104" />
@@ -164,9 +174,14 @@ export function JiangchengMap({
           </g>
 
           {/* ================= 樱语山坡 ================= */}
-          <g className="v2-vignette" data-region="sakura">
-            <ellipse cx="985" cy="165" rx="155" ry="110" fill="#c06b82" fillOpacity="0.12" />
-            <ellipse cx="985" cy="165" rx="155" ry="110" fill="none" stroke="#c06b82" strokeOpacity="0.5" strokeDasharray="8 7" />
+          <g
+            className="v2-vignette"
+            data-region="sakura"
+            data-unlocked={save.unlockedRegions.includes('sakura')}
+            transform="translate(0 16)"
+          >
+            <ellipse cx="985" cy="165" rx="150" ry="86" fill="#c06b82" fillOpacity="0.15" />
+            <ellipse cx="985" cy="165" rx="150" ry="86" fill="none" stroke="#c06b82" strokeOpacity="0.55" strokeDasharray="8 7" />
             <g stroke="#14212b" strokeWidth="2.2" fill="none" opacity="0.75">
               {/* 山脊 */}
               <path d="M850 196 q 70 -72 150 -58 t 120 -8" strokeOpacity="0.35" />
@@ -193,9 +208,14 @@ export function JiangchengMap({
           </g>
 
           {/* ================= 雷鸣创想站 ================= */}
-          <g className="v2-vignette" data-region="thunder">
-            <ellipse cx="965" cy="565" rx="150" ry="105" fill="#2b7570" fillOpacity="0.12" />
-            <ellipse cx="965" cy="565" rx="150" ry="105" fill="none" stroke="#2b7570" strokeOpacity="0.5" strokeDasharray="8 7" />
+          <g
+            className="v2-vignette"
+            data-region="thunder"
+            data-unlocked={save.unlockedRegions.includes('thunder')}
+            transform="translate(0 -30)"
+          >
+            <ellipse cx="965" cy="565" rx="146" ry="88" fill="#2b7570" fillOpacity="0.15" />
+            <ellipse cx="965" cy="565" rx="146" ry="88" fill="none" stroke="#2b7570" strokeOpacity="0.55" strokeDasharray="8 7" />
             <g stroke="#14212b" strokeWidth="2.2" fill="none" opacity="0.78">
               {/* 厂房 */}
               <path d="M880 590 h88 v-58 h-88 z" />
@@ -236,13 +256,13 @@ export function JiangchengMap({
             <path d="M114 272 h18 v14 h-18 z M114 272 l9 -7 l9 7" />
             <path d="M1080 420 h30 v22 h-30 z M1080 420 l15 -11 l15 11" />
             <path d="M1104 442 v 10 M 1088 452 h28" />
-            {/* 树 */}
-            <path d="M500 120 l9 -18 l9 18 z M500 120 h18 M 509 120 v 8" />
-            <path d="M548 148 l7 -14 l7 14 z M548 148 h14 M 555 148 v 6" />
+            {/* 树（避开正中江风渡口标注区） */}
+            <path d="M404 128 l9 -18 l9 18 z M404 128 h18 M 413 128 v 8" />
+            <path d="M446 154 l7 -14 l7 14 z M446 154 h14 M 453 154 v 6" />
             <path d="M700 620 l9 -18 l9 18 z M700 620 h18 M 709 620 v 8" />
             <path d="M744 646 l7 -14 l7 14 z M744 646 h14" />
             <path d="M420 560 l8 -16 l8 16 z M420 560 h16 M 428 560 v 7" />
-            <path d="M840 120 l7 -14 l7 14 z M840 120 h14" />
+            <path d="M768 122 l7 -14 l7 14 z M768 122 h14" />
           </g>
           <g opacity="0.32">
             {/* 过早巷排队的人 */}
@@ -268,16 +288,45 @@ export function JiangchengMap({
           </g>
 
           {/* 罗盘与比例尺 */}
-          <g opacity="0.7">
-            <circle cx="1110" cy="620" r="24" fill="none" stroke="#14212b" strokeWidth="1.6" />
-            <path d="M1110 596 l 7 22 l -7 -5 l -7 5 z" fill="#14212b" />
-            <text x="1110" y="662" textAnchor="middle" fontSize="12.5" fill="#14212b" fontFamily="'PingFang SC', 'Microsoft YaHei', sans-serif">
+          <g opacity="0.72">
+            <circle cx="1126" cy="622" r="22" fill="none" stroke="#14212b" strokeWidth="1.6" />
+            <path d="M1126 600 l 6 20 l -6 -4 l -6 4 z" fill="#14212b" />
+            <text x="1126" y="660" textAnchor="middle" fontSize="12" fill="#14212b" fontFamily="'PingFang SC', 'Microsoft YaHei', sans-serif">
               N
             </text>
-            <path d="M40 690 h64 M40 686 v 8 M72 686 v 8 M104 686 v 8" stroke="#14212b" strokeWidth="1.5" />
-            <text x="114" y="694" fontSize="12.5" fill="#4c5a63" fontFamily="'PingFang SC', 'Microsoft YaHei', sans-serif">
+            <path d="M28 690 h48 M28 686 v 8 M52 686 v 8 M76 686 v 8" stroke="#14212b" strokeWidth="1.5" />
+            <text x="84" y="694" fontSize="12" fill="#4c5a63" fontFamily="'PingFang SC', 'Microsoft YaHei', sans-serif">
               虚构比例
             </text>
+          </g>
+
+          {/* 区域标牌引导针脚（卡框指向各自观测域边缘） */}
+          <g fill="none">
+            {REGION_ORDER.map((id) => {
+              const p = POS[id];
+              const isSelected = id === selectedRegionId;
+              return (
+                <g key={`pin-${id}`}>
+                  <line
+                    x1={p.labelX}
+                    y1={p.labelY}
+                    x2={p.x}
+                    y2={p.stemY}
+                    stroke={isSelected ? '#e2402b' : REGIONS[id].accent}
+                    strokeWidth={isSelected ? 2 : 1.4}
+                    strokeDasharray="3 4"
+                    strokeOpacity={isSelected ? 0.9 : 0.48}
+                  />
+                  <circle
+                    cx={p.x}
+                    cy={p.stemY}
+                    r={isSelected ? 4 : 3}
+                    fill={isSelected ? '#e2402b' : REGIONS[id].accent}
+                    fillOpacity={isSelected ? 0.95 : 0.6}
+                  />
+                </g>
+              );
+            })}
           </g>
 
           {/* 当前选中区域的动态观测脉冲信标与坐标十字准星 */}
