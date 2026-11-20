@@ -231,7 +231,7 @@ export const QUEST_DEFS: QuestDef[] = [
   {
     id: 'q_evolved_master',
     title: '掌握一条路',
-    desc: '完成进化并把等级带到 5。',
+    desc: '完成一次进化，再把等级练到 5。',
     kind: 'growth',
     target: 1,
     progress: (save) => (save.collection.some((item) => item.evolutionId && item.level >= 5) ? 1 : 0),

@@ -282,7 +282,7 @@ export function V2App() {
       if (!save.unlockedRegions.includes(regionId)) {
         const region = REGIONS[regionId];
         const previous = region.unlockAfter ? REGIONS[region.unlockAfter] : null;
-        showToast(previous ? `先完成「${previous.name}」解锁这里` : '这个区域还没有解锁');
+        showToast(previous ? `先完成「${previous.name}」解锁这里` : '这里还没有解锁');
         return;
       }
       const next = startRegionRun(save, regionId, newSeed(regionId));
@@ -530,7 +530,7 @@ export function V2App() {
   const handleQuestAi = useCallback(async () => {
     const active = QUEST_DEFS.filter((quest) => ['active', 'complete'].includes(questState(quest, save)));
     if (active.length === 0) {
-      showToast('现在没有可推荐的任务');
+      showToast('现在没有能推荐的任务');
       return;
     }
     setQuestPlanning(true);
@@ -645,7 +645,7 @@ export function V2App() {
     (questId: string) => {
       const next = claimQuest(save, questId);
       if (next === save) {
-        showToast('奖励还不能领取');
+        showToast('这个奖励还不能领');
         return;
       }
       const quest = QUEST_BY_ID.get(questId);

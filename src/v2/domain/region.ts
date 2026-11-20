@@ -201,7 +201,7 @@ export const EVENTS: Record<string, GameEvent> = {
   ev_zao_queue: {
     id: 'ev_zao_queue',
     title: '排队的人',
-    text: '前面的人忘了带钱，摊主看着他，他身后的人都看着摊主。',
+    text: '前面的人忘了带钱。摊主看着他，他身后的人看着摊主。',
     choices: [
       { id: 'help', label: '替他付了', desc: '队伍羁绊 +2', effect: { kind: 'bond', amount: 2 }, flags: ['zao_helped'] },
       { id: 'grab', label: '趁乱多拿一份', desc: '获得 2 材料', effect: { kind: 'materials', amount: 2 } },
@@ -219,9 +219,9 @@ export const EVENTS: Record<string, GameEvent> = {
   ev_bridge_toolbox: {
     id: 'ev_bridge_toolbox',
     title: '工具箱',
-    text: '桥工把工具箱落在了桥洞里。里面有一枚旧信物。',
+    text: '桥工把工具箱落在了桥洞里，里面有一枚旧信物。',
     choices: [
-      { id: 'repair', label: '帮桥工把桥修好', desc: '获得 1 信物', effect: { kind: 'tokens', amount: 1 }, flags: ['bridge_fixed'] },
+      { id: 'repair', label: '把工具箱送回去', desc: '获得 1 信物', effect: { kind: 'tokens', amount: 1 }, flags: ['bridge_fixed'] },
       { id: 'scrap', label: '拆下还能用的零件', desc: '获得 3 材料', effect: { kind: 'materials', amount: 3 } },
     ],
   },
@@ -283,9 +283,9 @@ export const EVENTS: Record<string, GameEvent> = {
   ev_zao_second: {
     id: 'ev_zao_second',
     title: '第二碗',
-    text: '摊主认出了你，什么也没问，又盛了一碗。汤面很烫，队伍安静了一会儿。',
+    text: '摊主认出了你，什么也没问，又盛了一碗。面很烫，队伍安静了一会儿。',
     choices: [
-      { id: 'eat', label: '坐下来吃完', desc: '开局护盾 +8，羁绊 +1', requiresFlag: 'zao_helped', effect: { kind: 'startShield', amount: 8 } },
+      { id: 'eat', label: '坐下来吃完', desc: '下一场开局 +8 护盾', requiresFlag: 'zao_helped', effect: { kind: 'startShield', amount: 8 } },
       { id: 'pack', label: '打包带走', desc: '获得 2 材料', effect: { kind: 'materials', amount: 2 } },
     ],
   },
@@ -294,7 +294,7 @@ export const EVENTS: Record<string, GameEvent> = {
     title: '最后一勺辣油',
     text: '老板把一勺辣油递过来：「大厨怕这个。」',
     choices: [
-      { id: 'take', label: '收下辣油', desc: 'Boss 血量 -8%，开局 +6 护盾', effect: { kind: 'bossHp', amount: -8 } },
+      { id: 'take', label: '收下辣油', desc: 'Boss 血量 -8%', effect: { kind: 'bossHp', amount: -8 } },
       { id: 'sell', label: '拿去换材料', desc: '获得 3 材料', effect: { kind: 'materials', amount: 3 } },
     ],
   },
@@ -330,7 +330,7 @@ export const EVENTS: Record<string, GameEvent> = {
     title: '一颗种子',
     text: '树根边有一颗没发芽的种子。档案员大概不会注意到它。',
     choices: [
-      { id: 'plant', label: '种在坡上', desc: '羁绊 +2，开局 +6 护盾', effect: { kind: 'startShield', amount: 6 } },
+      { id: 'plant', label: '种在坡上', desc: '下一场开局 +6 护盾', effect: { kind: 'startShield', amount: 6 } },
       { id: 'take', label: '带回去研究', desc: '获得 2 材料', effect: { kind: 'materials', amount: 2 } },
     ],
   },
@@ -346,7 +346,7 @@ export const EVENTS: Record<string, GameEvent> = {
   ev_thunder_blueprint: {
     id: 'ev_thunder_blueprint',
     title: '主脑的图纸',
-    text: '图纸上标着主脑的三个供电节点。你只需要掐掉一个。',
+    text: '图纸上标着主脑的三个供电节点。记下其中一个，就够让它分神。',
     choices: [
       { id: 'cut', label: '标记节点', desc: 'Boss 血量 -12%', requiresFlag: 'invention_started', effect: { kind: 'bossHp', amount: -12 } },
       { id: 'sell', label: '卷起来换钱', desc: '获得 1 信物', effect: { kind: 'tokens', amount: 1 } },
@@ -377,7 +377,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
   zao: {
     id: 'zao',
     name: '过早巷',
-    subtitle: '锅气、队伍与一碗热干面的火候',
+    subtitle: '锅气、人声与一碗热干面的火候',
     accent: '#c58b25',
     bossId: 'zao_boss',
     landmark: '蒸笼与芝麻磨',

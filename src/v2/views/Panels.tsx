@@ -16,6 +16,19 @@ import { ELEMENTS } from '../../features/monsters/elements';
 import { MonsterSprite } from '../../features/monsters/MonsterSprite';
 import { JiangchengMap } from './JiangchengMap';
 
+const FLAG_LABEL: Record<string, string> = {
+  lamp_lit: '把灯点亮',
+  ferry_fixed: '把渡船修好',
+  warm: '在蒸汽里取暖',
+  zao_helped: '替前面的人付钱',
+  bridge_connected: '把桥接上',
+  bridge_fixed: '把工具箱送回去',
+  petal_kept: '接住一片花瓣',
+  photo_kept: '收起旧照片',
+  power_on: '合上闸',
+  invention_started: '启动旧机器',
+};
+
 function ElementBadge({ element }: { element: V2Creature['element'] }) {
   const meta = ELEMENTS[element];
   return (
@@ -403,7 +416,7 @@ export function RegionMap({
                         key={choice.id}
                         onClick={() => onChooseEvent(event.id, choice.id)}
                         disabled={lockedChoice}
-                        title={lockedChoice ? `需要先留下「${choice.requiresFlag}」的线索` : choice.desc}
+                        title={lockedChoice ? `需要先留下「${FLAG_LABEL[choice.requiresFlag!] ?? '前面的线索'}」` : choice.desc}
                       >
                         <b>{choice.label}</b>
                         <span>{lockedChoice ? '还缺少前置线索' : choice.desc}</span>
@@ -458,7 +471,7 @@ export function RegionMap({
             <p className="v2-rubric">区域规则</p>
             <p className="fineprint">
               {region.id === 'river'
-                ? '暴雨会淋湿全队；有护盾/防御时伤害减半。Boss 半血进入第二阶段，积水成渊更频繁。'
+                ? '暴雨会淋湿全队；主战有护盾或防御时，范围伤害会被挡下大半。Boss 半血进入第二阶段，积水成渊更频繁。'
                 : region.id === 'zao'
                   ? '每次命中会给大厨叠加「热度」。热度到 3 时进入第二阶段，锅气爆炒会附加脆弱。'
                   : region.id === 'bridge'
@@ -572,7 +585,7 @@ export function BattleResult({
         </span>
         <div>
           <p className="v2-rubric">探索战结算 · {resultRegion.name}</p>
-          <h2 className="v2-h2">{win ? '风暴停了一小会儿' : battle.outcome === 'lose' ? '这次被潮水压过去了' : '打平了，但潮水还没退'}</h2>
+          <h2 className="v2-h2">{win ? '这一局，站稳了。' : battle.outcome === 'lose' ? '这次被压过去了。' : '打平了，谁都没退。'}</h2>
           <p className="v2-lede">
             {summary.rounds} 回合 · 敌方 AI 参与 {summary.aiRounds} / {battle.planLog.length} 回合 · 奖励材料 {summary.rewards.materials}
             {summary.rewards.tokens ? ` · 信物 ${summary.rewards.tokens}` : ''}

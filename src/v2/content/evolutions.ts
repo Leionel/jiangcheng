@@ -195,7 +195,7 @@ export const EVOLUTION_GROUPS: EvolutionGroup[] = [
         id: 'cup_guard',
         groupId: 'cup',
         name: '保温瓶卫',
-        desc: '把温度和护盾一起拧紧。',
+        desc: '把温度拧紧，也把护盾拧紧。',
         path: 'guardian',
         statBonus: { hp: 16, atk: 2, def: 4, spd: 0 },
         moduleId: 'A13',
