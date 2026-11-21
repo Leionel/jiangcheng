@@ -242,6 +242,8 @@ export function BattleView2({
   const [floats, setFloats] = useState<Float[]>([]);
   const [shake, setShake] = useState<'enemy' | number | null>(null);
   const [roundFlash, setRoundFlash] = useState<number | null>(null);
+  const [showSwapDrawer, setShowSwapDrawer] = useState(false);
+  const [showLogDrawer, setShowLogDrawer] = useState(false);
   const prevBattle = useRef(battle);
   const timers = useRef<number[]>([]);
   const floatId = useRef(0);
@@ -305,6 +307,17 @@ export function BattleView2({
     <section className="v2-battle">
       <div className="v2-battle-head">
         <div className="v2-battle-meta">
+          <button
+            type="button"
+            className="v2-btn v2-btn-sm v2-battle-toggle"
+            data-open={showSwapDrawer}
+            onClick={() => {
+              setShowSwapDrawer((prev) => !prev);
+              setShowLogDrawer(false);
+            }}
+          >
+            ⇄ 队伍与换位 ({battle.team.filter((m) => m.alive).length}/{battle.team.length})
+          </button>
           <span className="v2-badge" data-kind="round">第 {battle.round} / {battle.maxRounds} 回合</span>
           <span className="v2-badge" data-kind="matchup" data-tone={matchupTone}>{matchupText}</span>
           <span className="v2-badge" data-kind={intent?.source === 'ai' ? 'ai' : 'rule'}>
@@ -318,6 +331,17 @@ export function BattleView2({
               <i key={index} data-on={index < battle.resonance} />
             ))}
           </span>
+          <button
+            type="button"
+            className="v2-btn v2-btn-sm v2-battle-toggle"
+            data-open={showLogDrawer}
+            onClick={() => {
+              setShowLogDrawer((prev) => !prev);
+              setShowSwapDrawer(false);
+            }}
+          >
+            📜 战报 ({battle.log.length})
+          </button>
           <button type="button" className="v2-btn v2-btn-ghost v2-btn-sm" onClick={onExit}>
             退出战斗
           </button>
@@ -336,6 +360,102 @@ export function BattleView2({
             第 {roundFlash} 回合
           </div>
         ) : null}
+
+        {showSwapDrawer ? (
+          <div className="v2-battle-drawer" data-side="left" role="dialog" aria-label="队伍与换位">
+            <div className="v2-drawer-head">
+              <span>队伍状态与换位（共鸣 1 · 换上获 4 护盾 / 旧主战回 4 HP）</span>
+              <button type="button" className="v2-link-btn" onClick={() => setShowSwapDrawer(false)}>收起 ×</button>
+            </div>
+            <div className="v2-party-board">
+              {battle.team.map((member, index) => {
+                const memberShield = member.statuses.find((status) => status.id === 'shield')?.stacks ?? 0;
+                const supCmd = SUPPORT_BY_ID.get(member.creature.supportCommandId);
+                const swapAction = swapActions.find((action) => action.targetIndex === index);
+                return (
+                  <div
+                    className="v2-member"
+                    key={member.creature.id}
+                    data-active={index === battle.activeIndex}
+                    data-dead={!member.alive}
+                    data-shake={shake === index}
+                  >
+                    <span className="v2-member-art">
+                      <MonsterSprite recipe={member.creature.visual} mood={member.alive ? 'idle' : 'hurt'} title={member.creature.name} />
+                      {supportFloats(index)}
+                    </span>
+                    <div className="v2-member-main">
+                      <div className="v2-member-head">
+                        <b>{member.creature.name}</b>
+                        <span className="v2-badge" data-kind={index === battle.activeIndex ? 'active' : 'reserve'}>
+                          {index === battle.activeIndex ? '出战中' : '支援'}
+                        </span>
+                        <span className="v2-member-path" style={{ color: PATH_META[member.creature.buildPath].color }}>
+                          {PATH_META[member.creature.buildPath].name}
+                        </span>
+                      </div>
+                      <Bar
+                        value={member.hp}
+                        max={member.creature.stats.hp}
+                        color={index === battle.activeIndex ? 'var(--riso-blue)' : 'var(--riso-teal)'}
+                        label="HP"
+                        shield={memberShield}
+                      />
+                      <div className="v2-status-row">
+                        {index !== battle.activeIndex && member.alive && supCmd ? (
+                          <span className="v2-status">
+                            支援：{supCmd.name}{member.supportCd > 0 ? `（冷却 ${member.supportCd}）` : ' · 就绪'}
+                          </span>
+                        ) : null}
+                        {member.statuses
+                          .filter((status) => status.id !== 'shield')
+                          .map((status) => (
+                            <span className="v2-status" key={status.id}>{statusText(status)}</span>
+                          ))}
+                        {!member.alive ? <span className="v2-status" data-bad="true">倒下</span> : null}
+                      </div>
+                      {index !== battle.activeIndex && member.alive ? (
+                        <button
+                          type="button"
+                          className="v2-btn v2-btn-sm v2-swap-btn"
+                          onClick={() => {
+                            if (swapAction) {
+                              onMain(swapAction);
+                              setShowSwapDrawer(false);
+                            }
+                          }}
+                          disabled={Boolean(battle.outcome) || !swapAction}
+                        >
+                          {swapAction ? '换位上场 (共鸣 1)' : '共鸣不足'}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        {showLogDrawer ? (
+          <aside className="v2-battle-drawer v2-battle-log" data-side="right" role="dialog" aria-label="战报明细">
+            <div className="v2-drawer-head">
+              <span>战报 · {battle.log.length} 条（规则 {battle.maxRounds} 回合 · 种子 {battle.seed.slice(-5)}）</span>
+              <button type="button" className="v2-link-btn" onClick={() => setShowLogDrawer(false)}>收起 ×</button>
+            </div>
+            <div className="v2-log" aria-live="polite">
+              {battle.log.slice(-8).map((event, index) => (
+                <div className="v2-log-line" data-kind={event.kind} key={`${event.round}-${index}-${event.kind}`}>
+                  <span className="v2-log-round">R{event.round}</span>
+                  <span>{event.text}</span>
+                  {event.detail ? <span className="v2-log-detail">{event.detail}</span> : null}
+                </div>
+              ))}
+            </div>
+            {!preferLive ? <p className="fineprint">当前为规则出招模式；开启实时 AI 后 Boss 会在合法行动中自主选招。</p> : null}
+          </aside>
+        ) : null}
+
         <div className="v2-enemy-card" data-shake={shake === 'enemy'}>
           <div className="v2-duel-canvas">
             <DuelBackdrop bossRule={battle.enemy.def.bossRule} element={battle.enemy.def.element} />
@@ -363,13 +483,16 @@ export function BattleView2({
                 label="HP"
                 shield={active.statuses.find((status) => status.id === 'shield')?.stacks ?? 0}
               />
-              {active.statuses.length > 0 ? (
-                <div className="v2-status-row">
-                  {active.statuses.map((status) => (
-                    <span className="v2-status" key={status.id}>{statusText(status)}</span>
-                  ))}
-                </div>
-              ) : null}
+              {(() => {
+                const extras = active.statuses.filter((status) => status.id !== 'shield');
+                return extras.length > 0 ? (
+                  <div className="v2-status-row">
+                    {extras.map((status) => (
+                      <span className="v2-status" key={status.id}>{statusText(status)}</span>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
             </div>
 
             <div className="v2-duel-vs" aria-hidden="true">
@@ -394,6 +517,10 @@ export function BattleView2({
                 </div>
               </div>
               <div className="v2-duel-figure v2-enemy-art">
+                <span className="v2-foe-intent-pill" data-action={intent?.action ?? 'strike'}>
+                  {intent?.action === 'guard' || intent?.action === 'gather' ? '🛡 ' : '⚔ '}
+                  {ACTION_LABEL[intent?.action ?? 'strike']} · {intent && intent.estimate > 0 ? `${intent.estimate} 伤` : '蓄势'}
+                </span>
                 <span className="v2-duel-plinth" aria-hidden="true" />
                 <span className="v2-enemy-glyph" aria-hidden="true">{enemyElement.glyph}</span>
                 <MonsterSprite
@@ -415,14 +542,16 @@ export function BattleView2({
                 label="HP"
                 shield={battle.enemy.shield}
               />
-              {battle.enemy.shield > 0 || battle.enemy.statuses.length > 0 ? (
-                <div className="v2-status-row">
-                  {battle.enemy.shield > 0 ? <span className="v2-status">护盾 {battle.enemy.shield}</span> : null}
-                  {battle.enemy.statuses.map((status) => (
-                    <span className="v2-status" key={status.id}>{statusText(status)}</span>
-                  ))}
-                </div>
-              ) : null}
+              {(() => {
+                const extras = battle.enemy.statuses.filter((status) => status.id !== 'shield');
+                return extras.length > 0 ? (
+                  <div className="v2-status-row">
+                    {extras.map((status) => (
+                      <span className="v2-status" key={status.id}>{statusText(status)}</span>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
             </div>
           </div>
 
@@ -439,63 +568,13 @@ export function BattleView2({
           </div>
           {aiNote ? <p className="v2-ai-note">{aiNote}</p> : null}
         </div>
-
-        <div className="v2-party-board">
-          {battle.team.map((member, index) => {
-            const memberShield = member.statuses.find((status) => status.id === 'shield')?.stacks ?? 0;
-            const supCmd = SUPPORT_BY_ID.get(member.creature.supportCommandId);
-            return (
-              <div
-                className="v2-member"
-                key={member.creature.id}
-                data-active={index === battle.activeIndex}
-                data-dead={!member.alive}
-                data-shake={shake === index}
-              >
-                <span className="v2-member-art">
-                  <MonsterSprite recipe={member.creature.visual} mood={member.alive ? 'idle' : 'hurt'} title={member.creature.name} />
-                  {supportFloats(index)}
-                </span>
-                <div className="v2-member-main">
-                  <div className="v2-member-head">
-                    <b>{member.creature.name}</b>
-                    <span className="v2-badge" data-kind={index === battle.activeIndex ? 'active' : 'reserve'}>
-                      {index === battle.activeIndex ? '出战中' : '支援'}
-                    </span>
-                    <span className="v2-member-path" style={{ color: PATH_META[member.creature.buildPath].color }}>
-                      {PATH_META[member.creature.buildPath].name}
-                    </span>
-                  </div>
-                  <Bar
-                    value={member.hp}
-                    max={member.creature.stats.hp}
-                    color={index === battle.activeIndex ? 'var(--riso-blue)' : 'var(--riso-teal)'}
-                    label="HP"
-                    shield={memberShield}
-                  />
-                  <div className="v2-status-row">
-                    {index !== battle.activeIndex && member.alive && supCmd ? (
-                      <span className="v2-status">
-                        支援：{supCmd.name}{member.supportCd > 0 ? `（冷却 ${member.supportCd}）` : ' · 就绪'}
-                      </span>
-                    ) : null}
-                    {member.statuses.map((status) => (
-                      <span className="v2-status" key={status.id}>{statusText(status)}</span>
-                    ))}
-                    {!member.alive ? <span className="v2-status" data-bad="true">倒下</span> : null}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
       </div>
 
       <div className="v2-battle-deck">
         <div className="v2-deck-main">
           <div className="v2-deck-title-row">
             <span className="v2-rubric">主战行动 · {active.creature.name}</span>
-            <span className="fineprint">点击立即结算本回合{coach.tone === 'info' ? ` · ${coach.text}` : ''}</span>
+            <span className="fineprint">点选招式立即结算本回合</span>
           </div>
           {readySupportName ? (
             <div className="v2-combo-ready" role="status">
@@ -577,32 +656,9 @@ export function BattleView2({
 
         <div className="v2-deck-sub">
           <div className="v2-deck-title-row">
-            <span className="v2-rubric">可选附加 · 支援 / 连携 / 换位</span>
-            <span className="fineprint">不占回合，点完再点主战招式</span>
+            <span className="v2-rubric">辅助功能 · 支援与连携</span>
+            <span className="fineprint">不占回合，点完再点左侧主战招式</span>
           </div>
-          {swapActions.length > 0 ? (
-            <div className="v2-swap-strip">
-              {swapActions.map((action) => {
-                const target = battle.team[action.targetIndex];
-                return (
-                  <button
-                    type="button"
-                    className="v2-support-btn v2-swap-btn"
-                    key={`swap-${action.targetIndex}`}
-                    onClick={() => onMain(action)}
-                    disabled={Boolean(battle.outcome)}
-                    title="换位：新主战获 4 护盾，旧主战回 4 HP"
-                  >
-                    <span className="v2-support-head">
-                      <b>换位 · {target.creature.name}</b>
-                      <span className="v2-badge" data-kind="cost">共鸣 1</span>
-                    </span>
-                    <span>换上获 4 护盾 · 旧主战回 4 HP</span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
           <div className="v2-support-list">
             {supportActions.map((action) => {
               const isSupport = action.kind === 'support';
@@ -631,23 +687,6 @@ export function BattleView2({
           </div>
           {support ? <p className="v2-support-hint">已准备支援；选择左侧任一主战行动即可结算本回合。</p> : null}
         </div>
-
-        <aside className="v2-battle-log">
-          <div className="v2-deck-title-row">
-            <span className="v2-rubric">战报 · {battle.log.length} 条</span>
-            <span className="fineprint mono" title={battle.rulesetVersion}>规则 {battle.maxRounds} 回合 · 种子 {battle.seed.slice(-5)}</span>
-          </div>
-          <div className="v2-log" aria-live="polite">
-            {battle.log.slice(-6).map((event, index) => (
-              <div className="v2-log-line" data-kind={event.kind} key={`${event.round}-${index}-${event.kind}`}>
-                <span className="v2-log-round">R{event.round}</span>
-                <span>{event.text}</span>
-                {event.detail ? <span className="v2-log-detail">{event.detail}</span> : null}
-              </div>
-            ))}
-          </div>
-          {!preferLive ? <p className="fineprint">当前为规则出招模式；开启实时 AI 后 Boss 会在合法行动中自主选招。</p> : null}
-        </aside>
       </div>
 
       {battle.outcome ? (

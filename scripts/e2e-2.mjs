@@ -181,7 +181,17 @@ async function shot(name) {
   const clip = { x: 0, y: 0, width: Math.ceil(size.width), height: Math.min(Math.ceil(size.height), 4000), scale: 1 };
   const { data } = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip });
   const file = join(OUT, `${name}.png`);
-  await writeFile(file, Buffer.from(data, 'base64'));
+  const buf = Buffer.from(data, 'base64');
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      await writeFile(file, buf);
+      break;
+    } catch (err) {
+      if (attempt === 3) throw err;
+      await rm(file, { force: true }).catch(() => {});
+      await sleep(200);
+    }
+  }
   console.log(`  截图 ${file}`);
 }
 

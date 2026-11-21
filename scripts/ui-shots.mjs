@@ -148,7 +148,18 @@ async function shot(name, full = false, keepScroll = false) {
     };
   }
   const { data } = await cdp.send('Page.captureScreenshot', params);
-  await writeFile(join(OUT, `${name}.png`), Buffer.from(data, 'base64'));
+  const file = join(OUT, `${name}.png`);
+  const buf = Buffer.from(data, 'base64');
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      await writeFile(file, buf);
+      break;
+    } catch (err) {
+      if (attempt === 3) throw err;
+      await rm(file, { force: true }).catch(() => {});
+      await sleep(200);
+    }
+  }
 }
 
 async function disableAi() {

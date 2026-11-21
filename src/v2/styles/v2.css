@@ -4527,8 +4527,8 @@
 
 .v2-hero-morph {
   display: grid;
-  grid-template-columns: minmax(180px, 0.72fr) auto minmax(0, 1.35fr);
-  gap: 16px;
+  grid-template-columns: minmax(124px, 0.48fr) auto minmax(0, 1.52fr);
+  gap: 10px;
   align-items: center;
 }
 
@@ -4540,14 +4540,14 @@
 .v2-hero-item-card {
   display: grid;
   gap: 6px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border: 1.5px dashed rgba(20, 33, 43, 0.4);
   background: var(--paper);
 }
 
 .v2-hero-item-card b {
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
 }
 
@@ -4577,23 +4577,25 @@
 }
 
 .v2-hero-arrow b {
-  font-size: 28px;
+  font-size: 22px;
   line-height: 1;
 }
 
 .v2-hero-creature {
   display: grid;
-  grid-template-columns: 116px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 12px;
   align-items: center;
-  padding: 12px 14px;
+  padding: 12px;
+  min-width: 0;
+  overflow: hidden;
   border: 2px solid var(--riso-red);
   background: rgba(226, 64, 43, 0.03);
 }
 
 .v2-hero-sprite {
-  width: 116px;
-  height: 116px;
+  width: 92px;
+  height: 92px;
   display: grid;
   place-items: center;
   border: 1.5px solid var(--ink);
@@ -4601,13 +4603,14 @@
 }
 
 .v2-hero-sprite svg {
-  width: 102px;
-  height: 102px;
+  width: 82px;
+  height: 82px;
   animation: v2-bob 3.2s ease-in-out infinite alternate;
 }
 
 .v2-hero-creature-info {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   min-width: 0;
 }
@@ -4628,16 +4631,19 @@
 .v2-hero-cta-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
   margin-top: 2px;
+  min-width: 0;
 }
 
 .v2-hero-cta-row .v2-btn {
-  white-space: nowrap;
+  padding: 7px 11px;
+  font-size: 13px;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  line-height: 1.25;
+  text-align: center;
 }
 
 .v2-choice[data-tag-gated="true"] {
@@ -4654,8 +4660,8 @@
 
 .v2-support-list {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 6px;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
 .v2-support-head {
@@ -4663,13 +4669,15 @@
 }
 
 .v2-support-btn {
-  min-height: 52px;
-  padding: 7px 10px;
+  min-height: 94px;
+  padding: 10px 12px;
+  align-content: start;
 }
 
 .v2-battle-deck {
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1.05fr) minmax(0, 0.85fr);
-  grid-template-areas: "main sub log";
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-areas: "main sub";
+  gap: 16px;
 }
 
 .v2-toast {
@@ -4858,11 +4866,10 @@
   }
 
   .v2-battle-deck {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
       "main"
-      "sub"
-      "log";
+      "sub";
   }
 
   .v2-hero-morph {
@@ -5501,7 +5508,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.24;
+  opacity: 0.36;
   pointer-events: none;
   z-index: 0;
 }
@@ -5510,13 +5517,193 @@
   position: absolute;
   inset: 0;
   background: linear-gradient(
-    90deg,
-    rgba(250, 248, 239, 0.42) 0%,
-    rgba(250, 248, 239, 0.14) 50%,
+    180deg,
+    rgba(250, 248, 239, 0.36) 0%,
+    rgba(250, 248, 239, 0.08) 45%,
     rgba(250, 248, 239, 0.42) 100%
   );
   pointer-events: none;
   z-index: 0;
+}
+
+/* ==================== 战斗舞台一体化与战盘质感升级 ==================== */
+.v2-duel-canvas {
+  align-items: start;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.v2-duel-plate,
+.v2-duel-foe .v2-enemy-head {
+  padding: 6px 10px;
+  background: rgba(250, 248, 239, 0.9);
+  border: 1.5px solid rgba(20, 33, 43, 0.24);
+  min-height: 60px;
+  align-content: center;
+}
+
+.v2-duel-foe .v2-enemy-head {
+  align-items: center;
+}
+
+.v2-duel-figure,
+.v2-duel-foe .v2-enemy-art {
+  min-height: 138px;
+  border: none;
+  background: transparent;
+  background-image: none;
+  overflow: visible;
+}
+
+.v2-duel-figure svg,
+.v2-duel-foe .v2-enemy-art svg {
+  width: 118px;
+  height: 118px;
+  filter: drop-shadow(0 3px 0 rgba(250, 248, 239, 0.88)) drop-shadow(0 6px 10px rgba(20, 33, 43, 0.2));
+}
+
+.v2-duel-plinth {
+  bottom: 6px;
+  width: 112px;
+  height: 20px;
+  background: rgba(20, 33, 43, 0.16);
+  border: 1.5px solid rgba(20, 33, 43, 0.28);
+}
+
+.v2-foe-intent-pill {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 3;
+  padding: 2px 8px;
+  border: 1.5px solid var(--riso-red);
+  background: var(--paper-hi);
+  color: var(--riso-red);
+  font-size: 11.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 2px 2px 0 rgba(226, 64, 43, 0.18);
+}
+
+.v2-foe-intent-pill[data-action="guard"],
+.v2-foe-intent-pill[data-action="gather"] {
+  border-color: var(--riso-blue);
+  color: var(--riso-blue);
+  box-shadow: 2px 2px 0 rgba(27, 78, 117, 0.16);
+}
+
+.v2-intent {
+  padding: 7px 10px;
+  gap: 2px;
+}
+
+.v2-intent-text,
+.v2-intent-reason {
+  font-size: 12.5px;
+  line-height: 1.42;
+}
+
+.v2-deck-title-row .fineprint {
+  font-size: 12px;
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.v2-battle,
+.v2-battle-stage,
+.v2-enemy-card,
+.v2-duel-canvas,
+.v2-duel-ally,
+.v2-duel-foe,
+.v2-battle-deck,
+.v2-deck-main,
+.v2-deck-sub,
+.v2-party-board,
+.v2-member,
+.v2-member-main {
+  min-width: 0;
+}
+
+.v2-battle-stage {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.v2-duel-canvas {
+  min-height: 210px;
+  padding: 14px 22px;
+  gap: 18px;
+}
+
+.v2-duel-figure,
+.v2-duel-foe .v2-enemy-art {
+  min-height: 148px;
+}
+
+.v2-duel-figure svg,
+.v2-duel-foe .v2-enemy-art svg {
+  width: 128px;
+  height: 128px;
+}
+
+.v2-battle-toggle[data-open="true"] {
+  border-color: var(--riso-red);
+  background: rgba(226, 64, 43, 0.08);
+  color: var(--riso-red);
+}
+
+.v2-battle-drawer {
+  position: absolute;
+  top: 8px;
+  z-index: 12;
+  width: min(420px, calc(100% - 16px));
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 12px;
+  border: 2px solid var(--ink);
+  background: var(--paper-hi);
+  box-shadow: 4px 4px 0 rgba(20, 33, 43, 0.22);
+}
+
+.v2-battle-drawer[data-side="left"] {
+  left: 8px;
+}
+
+.v2-battle-drawer[data-side="right"] {
+  right: 8px;
+}
+
+.v2-drawer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1.5px solid rgba(20, 33, 43, 0.2);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.v2-swap-btn {
+  justify-self: start;
+  margin-top: 4px;
+}
+
+.v2-skill {
+  box-shadow: 2px 2px 0 rgba(20, 33, 43, 0.14);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.v2-skill:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.v2-battle-log .v2-log {
+  padding: 8px 10px;
+  border: 1.5px solid rgba(20, 33, 43, 0.2);
+  background: var(--paper);
+  max-height: 220px;
 }
 
 @media (max-width: 720px) {
@@ -5530,5 +5717,69 @@
 
   .v2-region-scene-banner {
     height: 116px;
+  }
+
+  .v2-support-list {
+    grid-template-columns: 1fr;
+  }
+
+  .v2-support-btn {
+    min-height: 58px;
+    padding: 8px 10px;
+  }
+
+  .v2-duel-canvas {
+    min-height: 156px;
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .v2-duel-plate,
+  .v2-duel-foe .v2-enemy-head {
+    padding: 5px 6px;
+    min-height: 48px;
+  }
+
+  .v2-duel-name,
+  .v2-duel-foe .v2-enemy-name {
+    font-size: 15px;
+  }
+
+  .v2-duel-plinth {
+    width: 68px;
+    height: 13px;
+  }
+
+  .v2-duel-figure,
+  .v2-duel-foe .v2-enemy-art {
+    min-height: 108px;
+  }
+
+  .v2-duel-figure svg,
+  .v2-duel-foe .v2-enemy-art svg {
+    width: 88px;
+    height: 88px;
+  }
+
+  .v2-foe-intent-pill {
+    font-size: 10.5px;
+    padding: 1px 6px;
+  }
+
+  .v2-battle-drawer {
+    width: calc(100% - 12px);
+    left: 6px;
+    right: 6px;
+    max-height: 75vh;
+  }
+
+  .v2-battle-drawer[data-side="left"],
+  .v2-battle-drawer[data-side="right"] {
+    left: 6px;
+    right: 6px;
+  }
+
+  .v2-battle-drawer .v2-party-board {
+    grid-template-columns: 1fr;
   }
 }
