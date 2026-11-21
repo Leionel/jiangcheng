@@ -43,6 +43,7 @@ export function previewEvolution(creature: V2Creature, branch: EvolutionBranch) 
   return {
     name: branch.name,
     desc: branch.desc,
+    statBonus: branch.statBonus,
     stats: {
       hp: creature.stats.hp + branch.statBonus.hp,
       atk: creature.stats.atk + branch.statBonus.atk,
@@ -51,6 +52,11 @@ export function previewEvolution(creature: V2Creature, branch: EvolutionBranch) 
     },
     module,
     palette: branch.palette,
+    visual: {
+      ...creature.visual,
+      palette: branch.palette,
+      evolutionLayers: [...new Set([...creature.visual.evolutionLayers, ...branch.visualLayers])],
+    },
   };
 }
 

@@ -1012,16 +1012,21 @@ export function V2App() {
         <div className="v2-summon-overlay" role="dialog" aria-modal="true" aria-label="成长与进化">
           <div className="v2-evolve-panel">
             <div className="v2-panel-head">
-              <div>
-                <p className="v2-rubric">成长记录 · {evolutionGroupFor(evolveCreatureData).name}</p>
-                <h3 className="v2-h3">{evolveCreatureData.name} · Lv.{evolveCreatureData.level}</h3>
-                <p className="fineprint">
-                  {evolveCreatureData.evolutionId
-                    ? `已进化：${evolveCreatureData.evolutionId}`
-                    : evolveCreatureData.level >= 3
-                      ? '达到 3 级，可以消耗 1 个信物选择一条进化分支。'
-                      : '达到 3 级后解锁进化；可去区域战斗积累经验。'}
-                </p>
+              <div className="v2-evolve-origin">
+                <span className="v2-evolve-origin-art">
+                  <MonsterSprite recipe={evolveCreatureData.visual} title={evolveCreatureData.name} />
+                </span>
+                <div>
+                  <p className="v2-rubric">成长记录 · {evolutionGroupFor(evolveCreatureData).name}</p>
+                  <h3 className="v2-h3">{evolveCreatureData.name} · Lv.{evolveCreatureData.level}</h3>
+                  <p className="fineprint">
+                    {evolveCreatureData.evolutionId
+                      ? `已进化：${evolveCreatureData.evolutionId}`
+                      : evolveCreatureData.level >= 3
+                        ? '达到 3 级，可以消耗 1 个信物选择一条进化分支。'
+                        : '达到 3 级后解锁进化；可去区域战斗积累经验。'}
+                  </p>
+                </div>
               </div>
               <button type="button" className="v2-btn v2-btn-sm" onClick={() => setEvolveId(null)}>关闭</button>
             </div>
@@ -1052,15 +1057,36 @@ export function V2App() {
                   const recommended = branch.id === evoRecommendedId || evoGuide.includes(`推荐「${branch.name}」`);
                   return (
                     <div className="v2-evolve-card" key={branch.id} data-recommended={recommended}>
-                      <span className="v2-badge" data-kind="path">{PATH_LABEL[branch.path]}</span>
-                      {recommended ? <span className="v2-badge" data-kind="ai">AI 推荐</span> : null}
-                      <b>{preview.name}</b>
-                      <p className="fineprint">{preview.desc}</p>
+                      <div className="v2-evolve-card-top">
+                        <span className="v2-evolve-art">
+                          <MonsterSprite recipe={preview.visual} mood="happy" title={preview.name} />
+                        </span>
+                        <div className="v2-evolve-card-meta">
+                          <div className="v2-specimen-badges">
+                            <span className="v2-badge" data-kind="path">{PATH_LABEL[branch.path]}</span>
+                            {recommended ? <span className="v2-badge" data-kind="ai">AI 推荐</span> : null}
+                          </div>
+                          <b>{preview.name}</b>
+                          <p className="fineprint">{preview.desc}</p>
+                        </div>
+                      </div>
                       <div className="v2-specimen-stats">
-                        <span><em>HP</em><b>{preview.stats.hp}</b></span>
-                        <span><em>ATK</em><b>{preview.stats.atk}</b></span>
-                        <span><em>DEF</em><b>{preview.stats.def}</b></span>
-                        <span><em>SPD</em><b>{preview.stats.spd}</b></span>
+                        <span>
+                          <em>HP</em>
+                          <b>{preview.stats.hp}{preview.statBonus.hp ? <i className="v2-stat-up"> (+{preview.statBonus.hp})</i> : null}</b>
+                        </span>
+                        <span>
+                          <em>ATK</em>
+                          <b>{preview.stats.atk}{preview.statBonus.atk ? <i className="v2-stat-up"> (+{preview.statBonus.atk})</i> : null}</b>
+                        </span>
+                        <span>
+                          <em>DEF</em>
+                          <b>{preview.stats.def}{preview.statBonus.def ? <i className="v2-stat-up"> (+{preview.statBonus.def})</i> : null}</b>
+                        </span>
+                        <span>
+                          <em>SPD</em>
+                          <b>{preview.stats.spd}{preview.statBonus.spd ? <i className="v2-stat-up"> (+{preview.statBonus.spd})</i> : null}</b>
+                        </span>
                       </div>
                       <p className="fineprint">获得技能：{preview.module?.name} · {preview.module?.text}</p>
                       <button
@@ -1076,7 +1102,7 @@ export function V2App() {
                 })}
               </div>
             )}
-            <p className="fineprint">当前信物：{save.tokens}。进化会立即改变属性、技能与外观配色；可在同一面板回退。</p>
+            <p className="fineprint">当前信物：{save.tokens}。进化会立即改变属性、技能与外观轮廓配色；可在同一面板回退。</p>
           </div>
         </div>
       ) : null}

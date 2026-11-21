@@ -2,6 +2,14 @@ import type { CSSProperties } from 'react';
 import type { RegionId, SaveV2 } from '../domain/types';
 import { REGIONS, REGION_ORDER, getEnemy } from '../domain/region';
 
+export const REGION_SCENE_ART: Record<RegionId, string> = {
+  river: '/assets/art/region-river.jpg',
+  zao: '/assets/art/region-zao.jpg',
+  bridge: '/assets/art/region-bridge.jpg',
+  sakura: '/assets/art/region-sakura.jpg',
+  thunder: '/assets/art/region-thunder.jpg',
+};
+
 const POS: Record<RegionId, { x: number; y: number; labelX: number; labelY: number; stemY: number }> = {
   river: { x: 600, y: 392, labelX: 600, labelY: 162, stemY: 280 },
   zao: { x: 185, y: 188, labelX: 185, labelY: 48, stemY: 100 },
@@ -51,6 +59,11 @@ export function JiangchengMap({
             <pattern id="v2-world-water" width="18" height="14" patternUnits="userSpaceOnUse">
               <path d="M0 9 q 4.5 -4 9 0 t 9 0" fill="none" stroke="#1b4e75" strokeOpacity="0.22" strokeWidth="1.2" />
             </pattern>
+            <clipPath id="v2-rclip-zao"><ellipse cx="185" cy="170" rx="146" ry="88" /></clipPath>
+            <clipPath id="v2-rclip-bridge"><ellipse cx="255" cy="560" rx="142" ry="86" /></clipPath>
+            <clipPath id="v2-rclip-river"><ellipse cx="600" cy="392" rx="188" ry="110" /></clipPath>
+            <clipPath id="v2-rclip-sakura"><ellipse cx="985" cy="165" rx="150" ry="86" /></clipPath>
+            <clipPath id="v2-rclip-thunder"><ellipse cx="965" cy="565" rx="146" ry="88" /></clipPath>
           </defs>
           <rect width="1200" height="720" fill="#e9e5d8" />
           <rect width="1200" height="720" fill="url(#v2-world-grid)" />
@@ -95,7 +108,17 @@ export function JiangchengMap({
             transform="translate(0 18)"
           >
             <ellipse cx="185" cy="170" rx="146" ry="88" fill="#c58b25" fillOpacity="0.16" />
-            <ellipse cx="185" cy="170" rx="146" ry="88" fill="none" stroke="#c58b25" strokeOpacity="0.58" strokeDasharray="8 7" />
+            <image
+              href={REGION_SCENE_ART.zao}
+              x="39"
+              y="82"
+              width="292"
+              height="176"
+              preserveAspectRatio="xMidYMid slice"
+              clipPath="url(#v2-rclip-zao)"
+              opacity={save.unlockedRegions.includes('zao') ? 0.44 : 0.2}
+            />
+            <ellipse cx="185" cy="170" rx="146" ry="88" fill="none" stroke="#c58b25" strokeOpacity="0.62" strokeDasharray="8 7" strokeWidth="2" />
             <g stroke="#14212b" strokeWidth="2" fill="none" opacity="0.72">
               {/* 三个早点摊 */}
               <path d="M100 190 h54 v-24 h-54 z M100 166 l27 -18 l27 18" />
@@ -121,7 +144,17 @@ export function JiangchengMap({
             transform="translate(0 -32)"
           >
             <ellipse cx="255" cy="560" rx="142" ry="86" fill="#6b5b4e" fillOpacity="0.15" />
-            <ellipse cx="255" cy="560" rx="142" ry="86" fill="none" stroke="#6b5b4e" strokeOpacity="0.55" strokeDasharray="8 7" />
+            <image
+              href={REGION_SCENE_ART.bridge}
+              x="113"
+              y="474"
+              width="284"
+              height="172"
+              preserveAspectRatio="xMidYMid slice"
+              clipPath="url(#v2-rclip-bridge)"
+              opacity={save.unlockedRegions.includes('bridge') ? 0.44 : 0.2}
+            />
+            <ellipse cx="255" cy="560" rx="142" ry="86" fill="none" stroke="#6b5b4e" strokeOpacity="0.62" strokeDasharray="8 7" strokeWidth="2" />
             <g stroke="#14212b" strokeWidth="2.4" fill="none" opacity="0.78">
               {/* 支流上的拱桥 */}
               <path d="M170 548 h168" />
@@ -146,7 +179,17 @@ export function JiangchengMap({
           {/* ================= 江风渡口 ================= */}
           <g className="v2-vignette" data-region="river" data-unlocked={save.unlockedRegions.includes('river')}>
             <ellipse cx="600" cy="392" rx="188" ry="110" fill="#1b4e75" fillOpacity="0.15" />
-            <ellipse cx="600" cy="392" rx="188" ry="110" fill="none" stroke="#1b4e75" strokeOpacity="0.6" strokeDasharray="8 7" />
+            <image
+              href={REGION_SCENE_ART.river}
+              x="412"
+              y="282"
+              width="376"
+              height="220"
+              preserveAspectRatio="xMidYMid slice"
+              clipPath="url(#v2-rclip-river)"
+              opacity={save.unlockedRegions.includes('river') ? 0.44 : 0.22}
+            />
+            <ellipse cx="600" cy="392" rx="188" ry="110" fill="none" stroke="#1b4e75" strokeOpacity="0.68" strokeDasharray="8 7" strokeWidth="2" />
             <g stroke="#14212b" strokeWidth="2.2" fill="none" opacity="0.8">
               {/* 信号塔 */}
               <path d="M548 388 l 2 -104 M 584 388 l -2 -104" />
@@ -181,7 +224,17 @@ export function JiangchengMap({
             transform="translate(0 16)"
           >
             <ellipse cx="985" cy="165" rx="150" ry="86" fill="#c06b82" fillOpacity="0.15" />
-            <ellipse cx="985" cy="165" rx="150" ry="86" fill="none" stroke="#c06b82" strokeOpacity="0.55" strokeDasharray="8 7" />
+            <image
+              href={REGION_SCENE_ART.sakura}
+              x="835"
+              y="79"
+              width="300"
+              height="172"
+              preserveAspectRatio="xMidYMid slice"
+              clipPath="url(#v2-rclip-sakura)"
+              opacity={save.unlockedRegions.includes('sakura') ? 0.44 : 0.2}
+            />
+            <ellipse cx="985" cy="165" rx="150" ry="86" fill="none" stroke="#c06b82" strokeOpacity="0.62" strokeDasharray="8 7" strokeWidth="2" />
             <g stroke="#14212b" strokeWidth="2.2" fill="none" opacity="0.75">
               {/* 山脊 */}
               <path d="M850 196 q 70 -72 150 -58 t 120 -8" strokeOpacity="0.35" />
@@ -215,7 +268,17 @@ export function JiangchengMap({
             transform="translate(0 -30)"
           >
             <ellipse cx="965" cy="565" rx="146" ry="88" fill="#2b7570" fillOpacity="0.15" />
-            <ellipse cx="965" cy="565" rx="146" ry="88" fill="none" stroke="#2b7570" strokeOpacity="0.55" strokeDasharray="8 7" />
+            <image
+              href={REGION_SCENE_ART.thunder}
+              x="819"
+              y="477"
+              width="292"
+              height="176"
+              preserveAspectRatio="xMidYMid slice"
+              clipPath="url(#v2-rclip-thunder)"
+              opacity={save.unlockedRegions.includes('thunder') ? 0.44 : 0.2}
+            />
+            <ellipse cx="965" cy="565" rx="146" ry="88" fill="none" stroke="#2b7570" strokeOpacity="0.62" strokeDasharray="8 7" strokeWidth="2" />
             <g stroke="#14212b" strokeWidth="2.2" fill="none" opacity="0.78">
               {/* 厂房 */}
               <path d="M880 590 h88 v-58 h-88 z" />
@@ -337,12 +400,13 @@ export function JiangchengMap({
           </g>
         </svg>
 
-        {/* HTML 区域标签：可点击、带状态 */}
-        {REGION_ORDER.map((id) => {
+        {/* HTML 区域标签：可点击、带章节序号与状态 */}
+        {REGION_ORDER.map((id, idx) => {
           const region = REGIONS[id];
           const pos = POS[id];
           const status = regionStatus(save, id);
           const selected = id === selectedRegionId;
+          const chapter = String(idx + 1).padStart(2, '0');
           return (
             <button
               type="button"
@@ -354,7 +418,10 @@ export function JiangchengMap({
               onClick={() => onSelect(id)}
               aria-pressed={selected}
             >
-              {selected ? <span className="v2-world-label-tag">当前观测</span> : null}
+              <span className="v2-world-label-top">
+                <span className="v2-world-chapter">第{chapter}区</span>
+                {selected ? <span className="v2-world-label-tag">当前观测</span> : null}
+              </span>
               <span className="v2-world-label-name">
                 <i />
                 {region.name}
@@ -367,9 +434,10 @@ export function JiangchengMap({
       </div>
 
       <div className="v2-world-mobile">
-        {REGION_ORDER.map((id) => {
+        {REGION_ORDER.map((id, idx) => {
           const region = REGIONS[id];
           const status = regionStatus(save, id);
+          const chapter = String(idx + 1).padStart(2, '0');
           return (
             <button
               type="button"
@@ -380,7 +448,10 @@ export function JiangchengMap({
               style={{ '--region': region.accent } as CSSProperties}
               onClick={() => onSelect(id)}
             >
-              <span className="v2-world-mobile-mark">{region.name.slice(0, 1)}</span>
+              <span className="v2-world-mobile-thumb">
+                <img src={REGION_SCENE_ART[id]} alt="" aria-hidden="true" loading="lazy" />
+                <span className="v2-world-mobile-mark">{chapter}</span>
+              </span>
               <span>
                 <b>{region.name}</b>
                 <em>{status.label} · Boss {getEnemy(region.bossId)?.name}</em>

@@ -223,6 +223,14 @@ export function CaptureView2({
       {!draft && featuredSample && featuredPreview ? (
         <div className="v2-capture-landing">
           <div className="v2-hero">
+            <div className="v2-hero-banner">
+              <img
+                src="/assets/art/hero-banner.jpg"
+                alt="江城博物志 · 日常物灵画卷"
+                loading="eager"
+              />
+              <span className="v2-hero-banner-tag">江城博物志 · 卷一 · 灵物化生</span>
+            </div>
             <div className="v2-hero-morph">
               <div className="v2-hero-item">
                 <span className="v2-rubric">日常原物</span>

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
-import type { BuildPath, ExpeditionBattleState, RegionId, RegionRunState, SaveV2, V2Creature } from '../domain/types';
+import type { BuildPath, EventChoice, ExpeditionBattleState, RegionId, RegionRunState, SaveV2, V2Creature } from '../domain/types';
 import type { EnemyDef, RegionNodeDef } from '../domain/types';
 import { PATH_META, TAG_LABELS, tagDimension } from '../domain/tags';
 import { ACTIVE_BY_ID, LINKS, PASSIVE_BY_ID } from '../content/modules';
-import { choiceRequirementStatus, currentNode, getEnemy, getEvent, getRegion, nodeProgress } from '../domain/region';
+import { choiceRequirementStatus, currentNode, getEnemy, getEvent, getRegion, nodeProgress, REGION_ORDER } from '../domain/region';
 import { bondLabel, bondLevel } from '../domain/bonds';
 import { QUEST_DEFS, completedQuestCount, questProgress, questState } from '../domain/quests';
 import { canEvolve } from '../domain/evolution';
@@ -14,7 +14,7 @@ import { battleSummary } from '../domain/battle2';
 import { v2AiLog } from '../ai/gateway';
 import { ELEMENTS, matchupLabel, typeMultiplier } from '../../features/monsters/elements';
 import { MonsterSprite } from '../../features/monsters/MonsterSprite';
-import { JiangchengMap } from './JiangchengMap';
+import { JiangchengMap, REGION_SCENE_ART } from './JiangchengMap';
 
 const BOND_TIER_NAME = ['初识', '搭把手', '一起走', '过命的'] as const;
 
@@ -53,6 +53,16 @@ const FLAG_LABEL: Record<string, string> = {
   power_on: '合上闸',
   invention_started: '启动旧机器',
 };
+
+function eventRewardTag(effect: EventChoice['effect']): string | null {
+  if (effect.kind === 'runResonance') return `⚡ 开局共鸣 +${effect.amount}`;
+  if (effect.kind === 'materials') return `🧱 材料 +${effect.amount}`;
+  if (effect.kind === 'tokens') return `🪙 信物 +${effect.amount}`;
+  if (effect.kind === 'bond') return `❤️ 羁绊 +${effect.amount}`;
+  if (effect.kind === 'startShield') return `🛡️ 全队护盾 +${effect.amount}`;
+  if (effect.kind === 'bossHp') return `🗡️ 削弱 Boss ${Math.abs(effect.amount)}%`;
+  return null;
+}
 
 function ElementBadge({ element }: { element: V2Creature['element'] }) {
   const meta = ELEMENTS[element];
@@ -100,17 +110,20 @@ export function CreatureMiniCard({
     cardRef.current.style.setProperty('--card-rx', '0deg');
     cardRef.current.style.setProperty('--card-ry', '0deg');
   };
+  const elemMeta = ELEMENTS[creature.element];
   return (
     <div
       className="v2-specimen"
       data-active={Boolean(active)}
       data-evolved={Boolean(creature.evolutionId)}
+      style={{ '--elem-color': elemMeta.color } as CSSProperties}
       ref={cardRef}
       onPointerMove={handlePointerMove}
       onPointerLeave={resetTilt}
     >
       <div className="v2-specimen-body">
-        <span className="v2-specimen-art">
+        <span className="v2-specimen-art" style={{ background: `color-mix(in srgb, ${elemMeta.color} 10%, var(--paper))` }}>
+          <span className="v2-specimen-lv">Lv.{creature.level}</span>
           <MonsterSprite recipe={creature.visual} title={creature.name} />
         </span>
         <div className="v2-specimen-main">
@@ -124,7 +137,7 @@ export function CreatureMiniCard({
             <ElementBadge element={creature.element} />
             <PathBadge path={creature.buildPath} />
             {creature.evolutionId ? (
-              <span className="v2-badge" data-kind="ai">进化 · {evolutionBranchName(creature.evolutionId)}</span>
+              <span className="v2-badge" data-kind="ai">★ 已进化 · {evolutionBranchName(creature.evolutionId)}</span>
             ) : null}
             {tier ? <span className="v2-badge" data-kind="tier">{tier}</span> : null}
           </div>
@@ -444,6 +457,14 @@ export function RegionMap({
 
       <div className="v2-region-layout">
         <div className="v2-region-main">
+          <div className="v2-region-scene-banner" style={{ '--region': region.accent } as CSSProperties}>
+            <img src={REGION_SCENE_ART[region.id]} alt={region.name} loading="lazy" />
+            <div className="v2-region-scene-scrim" aria-hidden="true" />
+            <div className="v2-region-scene-tags">
+              <span>第{String(Math.max(1, REGION_ORDER.indexOf(region.id) + 1)).padStart(2, '0')}区 · {region.landmark}</span>
+              <span data-state={regionState}>{regionState === 'done' ? '已镇守' : regionState === 'active' ? '观测中' : unlocked ? '待勘探' : '未解锁'}</span>
+            </div>
+          </div>
           <div className="v2-region-title" style={{ '--region': region.accent } as CSSProperties}>
             <div>
               <p className="v2-rubric">当前查看 · {regionState === 'done' ? '已完成' : regionState === 'active' ? '进行中' : unlocked ? '可探索' : '未解锁'}</p>
@@ -477,7 +498,7 @@ export function RegionMap({
             {region.nodes.map((item, index) => {
               const state = completed || index < (run?.nodeIndex ?? 0) ? 'done' : index === (run?.nodeIndex ?? -1) ? 'current' : 'locked';
               const meta = NODE_TYPE_META[item.type];
-              const stateLabel = state === 'done' ? '已完成' : state === 'current' ? '当前站' : '待探索';
+              const stateLabel = state === 'done' ? '✓ 已通过' : state === 'current' ? '📍 当前所在' : '待探索';
               return (
                 <li key={item.id}>
                   <button
@@ -602,14 +623,18 @@ export function RegionMap({
                 </div>
               </div>
             ) : node.type === 'event' && event ? (
-              <div>
-                <p className="v2-rubric">当前节点 {progress.current} / {progress.total} · 事件</p>
+              <div className="v2-event-stage">
+                <div className="v2-event-banner">
+                  <span className="v2-rubric">✦ 奇遇事件 · 第 {progress.current} / {progress.total} 站</span>
+                  <span className="v2-badge" data-kind="mode">{region.landmark}</span>
+                </div>
                 <h3 className="v2-h3">{node.title}</h3>
                 <p className="v2-lede">{event.text}</p>
                 <div className="v2-event-choices">
                   {event.choices.map((choice) => {
                     const status = choiceRequirementStatus(choice, run, activeParty);
                     const tagName = choice.bonusTag ? TAG_LABELS[choice.bonusTag] : '';
+                    const rewardPill = eventRewardTag(choice.effect);
                     return (
                       <button
                         type="button"
@@ -621,7 +646,10 @@ export function RegionMap({
                         disabled={!status.available}
                         title={!status.available ? status.lockedReason : choice.bonusDesc ?? choice.desc}
                       >
-                        <b>{choice.label}</b>
+                        <span className="v2-choice-top">
+                          <b>{choice.label}</b>
+                          {rewardPill && status.available ? <em className="v2-choice-reward">{rewardPill}</em> : null}
+                        </span>
                         <span>{!status.available ? status.lockedReason : choice.desc}</span>
                         {status.available && status.bonusMatched && choice.bonusDesc ? (
                           <span className="v2-choice-bonus">✦ 队伍共振：{choice.bonusDesc}</span>
@@ -634,13 +662,47 @@ export function RegionMap({
                 </div>
               </div>
             ) : enemy ? (
-              <div>
-                <p className="v2-rubric">当前节点 {progress.current} / {progress.total} · {node.title}</p>
+              <div className="v2-prebattle-card">
+                <div className="v2-event-banner">
+                  <span className="v2-rubric">⚔ 遭遇对峙 · 第 {progress.current} / {progress.total} 站</span>
+                  <ElementBadge element={enemy.element} />
+                </div>
+                <div className="v2-prebattle-vs">
+                  {leadCreature ? (
+                    <div className="v2-prebattle-unit">
+                      <MonsterSprite recipe={leadCreature.visual} title={leadCreature.name} />
+                      <b>{leadCreature.name}</b>
+                      <span>主战 · Lv.{leadCreature.level}</span>
+                    </div>
+                  ) : null}
+                  <span className="v2-prebattle-mid">VS</span>
+                  <div className="v2-prebattle-unit">
+                    <MonsterSprite
+                      recipe={{
+                        shape: enemy.kind === 'boss' ? 'shard' : 'blob',
+                        crest: 'wave',
+                        accessory: 'none',
+                        palette: ['#8FB6C6', ELEMENTS[enemy.element].color, '#E8F2F5'],
+                      }}
+                      mood="angry"
+                      title={enemy.name}
+                    />
+                    <b>{enemy.name}</b>
+                    <span>HP {enemy.maxHp} · ATK {enemy.atk} · DEF {enemy.def}</span>
+                  </div>
+                </div>
                 <h3 className="v2-h3">{node.title}</h3>
-                <p className="v2-lede">{node.desc}</p>
-                <button type="button" className="v2-btn v2-btn-primary v2-btn-lg" onClick={() => onEnterBattle(node, enemy)}>
-                  {enemy.kind === 'boss' ? '挑战 Boss' : '进入战斗'}
-                </button>
+                <p className="v2-lede">{enemy.taunt}</p>
+                <div className="v2-node-actions">
+                  <button type="button" className="v2-btn v2-btn-primary v2-btn-lg" onClick={() => onEnterBattle(node, enemy)}>
+                    {enemy.kind === 'boss' ? '挑战 Boss' : '进入战斗'}
+                  </button>
+                  {leadCreature ? (
+                    <span className="v2-badge" data-kind="rule">
+                      当前主战对其{matchupLabel(typeMultiplier(leadCreature.element, enemy.element))}
+                    </span>
+                  ) : null}
+                </div>
               </div>
             ) : null}
           </div>

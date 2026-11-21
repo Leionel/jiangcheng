@@ -13,6 +13,20 @@ import { ACTIVE_BY_ID, LINK_BY_ID, SUPPORT_BY_ID } from '../content/modules';
 import { PATH_META } from '../domain/tags';
 import { ELEMENTS, typeMultiplier } from '../../features/monsters/elements';
 import { MonsterSprite } from '../../features/monsters/MonsterSprite';
+import { REGION_SCENE_ART } from './JiangchengMap';
+
+const REGION_BY_THEME: Record<string, keyof typeof REGION_SCENE_ART> = {
+  storm: 'river',
+  water: 'river',
+  heat: 'zao',
+  food: 'zao',
+  lock: 'bridge',
+  structure: 'bridge',
+  record: 'sakura',
+  nature: 'sakura',
+  thunder: 'thunder',
+  tool: 'thunder',
+};
 
 const ACTION_LABEL = ENEMY_ACTION_LABEL;
 
@@ -131,6 +145,63 @@ function buildCoachAdvice(
     tone: 'info',
     text: '先读「下一步意图」与属性克制关系，再决定进攻、蓄力或防御；技能冷却或共鸣不足时可用普通攻击。',
   };
+}
+
+const SKILL_KIND_META: Record<string, { icon: string; label: string }> = {
+  attack: { icon: '⚔', label: '攻击' },
+  guard: { icon: '🛡️', label: '防护' },
+  control: { icon: '✦', label: '诡计' },
+  heal: { icon: '🌿', label: '支援' },
+  buff: { icon: '⚡', label: '蓄势' },
+};
+
+function DuelBackdrop({ bossRule, element }: { bossRule?: string; element: string }) {
+  const theme = bossRule ?? element;
+  const sceneKey = REGION_BY_THEME[theme] ?? 'river';
+  return (
+    <>
+      <img
+        src={REGION_SCENE_ART[sceneKey]}
+        alt=""
+        aria-hidden="true"
+        className="v2-duel-scene-img"
+      />
+      <svg viewBox="0 0 600 180" preserveAspectRatio="xMidYMid slice" className="v2-duel-backdrop" aria-hidden="true">
+      {theme === 'storm' || theme === 'water' ? (
+        <g stroke="#1b4e75" strokeOpacity="0.16" fill="none" strokeWidth="2">
+          <path d="M0 140 q 45 -18 90 0 t 90 0 t 90 0 t 90 0 t 90 0 t 90 0" />
+          <path d="M20 160 q 45 -14 90 0 t 90 0 t 90 0 t 90 0 t 90 0 t 90 0" />
+          <path d="M90 18 l-10 26M190 12 l-10 26M310 20 l-10 26M420 14 l-10 26M520 22 l-10 26" strokeWidth="1.5" />
+        </g>
+      ) : theme === 'heat' || theme === 'food' ? (
+        <g stroke="#c9822f" strokeOpacity="0.18" fill="none" strokeWidth="2">
+          <path d="M80 150 q 14 -24 0 -48 M150 156 q 14 -28 0 -54 M440 152 q 14 -24 0 -48 M510 156 q 14 -28 0 -54" />
+          <path d="M40 145 h520" strokeDasharray="8 8" />
+        </g>
+      ) : theme === 'lock' || theme === 'structure' ? (
+        <g stroke="#6b5b4e" strokeOpacity="0.16" fill="none" strokeWidth="2.2">
+          <path d="M40 148 Q 300 40 560 148" />
+          <path d="M120 122 v26 M210 96 v52 M300 84 v64 M390 96 v52 M480 122 v26" />
+        </g>
+      ) : theme === 'record' || theme === 'nature' ? (
+        <g fill="#c06b82" fillOpacity="0.18">
+          <ellipse cx="90" cy="40" rx="8" ry="4" transform="rotate(-24 90 40)" />
+          <ellipse cx="220" cy="28" rx="7" ry="4" transform="rotate(18 220 28)" />
+          <ellipse cx="380" cy="48" rx="9" ry="4" transform="rotate(-14 380 48)" />
+          <ellipse cx="510" cy="34" rx="7" ry="4" transform="rotate(30 510 34)" />
+          <path d="M20 154 q 140 -26 280 0 t 280 0" stroke="#c06b82" strokeOpacity="0.18" strokeWidth="2" fill="none" />
+        </g>
+      ) : (
+        <g stroke="#2b7570" strokeOpacity="0.18" fill="none" strokeWidth="2">
+          <path d="M510 18 l-18 32 h18 l-14 32" stroke="#e2402b" strokeOpacity="0.22" />
+          <circle cx="110" cy="46" r="18" strokeDasharray="5 5" />
+          <path d="M30 148 h540" strokeDasharray="6 7" />
+        </g>
+      )}
+    </svg>
+    <div className="v2-duel-scene-wash" aria-hidden="true" />
+    </>
+  );
 }
 
 type Float = { id: number; side: 'enemy' | number; amount: number; kind: 'damage' | 'heal' };
@@ -266,35 +337,77 @@ export function BattleView2({
           </div>
         ) : null}
         <div className="v2-enemy-card" data-shake={shake === 'enemy'}>
-          <div className="v2-enemy-head">
-            <div>
-              <span className="v2-rubric">敌方 · {battle.enemy.def.kind === 'boss' ? 'BOSS' : '回响灵'}</span>
-              <h3 className="v2-enemy-name">{battle.enemy.def.name}</h3>
-            </div>
-            <div className="v2-enemy-badges">
-              <span className="v2-badge" data-kind="element" style={{ '--badge': enemyElement.color } as CSSProperties}>
-                <i />
-                {enemyElement.name}属性
-              </span>
-              <span className="v2-badge" data-kind="phase">阶段 {battle.enemy.phase}</span>
-            </div>
-          </div>
-          <div className="v2-enemy-body">
-            <div className="v2-enemy-art">
-              <span className="v2-enemy-glyph" aria-hidden="true">{enemyElement.glyph}</span>
-              <MonsterSprite
-                recipe={{
-                  shape: battle.enemy.def.kind === 'boss' ? 'shard' : 'blob',
-                  crest: ELEMENT_CREST[battle.enemy.def.element] ?? 'none',
-                  accessory: 'none',
-                  palette: ['#8FB6C6', enemyElement.color, '#E8F2F5'],
-                }}
-                mood={battle.enemy.hp <= battle.enemy.def.maxHp / 2 ? 'angry' : 'idle'}
-                title={battle.enemy.def.name}
+          <div className="v2-duel-canvas">
+            <DuelBackdrop bossRule={battle.enemy.def.bossRule} element={battle.enemy.def.element} />
+            <div className="v2-duel-ally" data-shake={shake === battle.activeIndex}>
+              <div className="v2-duel-plate">
+                <div className="v2-duel-title">
+                  <span className="v2-badge" data-kind="active">我方主战</span>
+                  <span className="v2-duel-lv">Lv.{active.creature.level}</span>
+                </div>
+                <h3 className="v2-duel-name">{active.creature.name}</h3>
+              </div>
+              <div className="v2-duel-figure">
+                <span className="v2-duel-plinth" aria-hidden="true" />
+                <MonsterSprite
+                  recipe={active.creature.visual}
+                  mood={active.hp <= active.creature.stats.hp * 0.3 ? 'hurt' : 'idle'}
+                  title={active.creature.name}
+                />
+                {supportFloats(battle.activeIndex)}
+              </div>
+              <Bar
+                value={active.hp}
+                max={active.creature.stats.hp}
+                color="var(--riso-blue)"
+                label="HP"
+                shield={active.statuses.find((status) => status.id === 'shield')?.stacks ?? 0}
               />
-              {supportFloats('enemy')}
+              {active.statuses.length > 0 ? (
+                <div className="v2-status-row">
+                  {active.statuses.map((status) => (
+                    <span className="v2-status" key={status.id}>{statusText(status)}</span>
+                  ))}
+                </div>
+              ) : null}
             </div>
-            <div className="v2-enemy-info">
+
+            <div className="v2-duel-vs" aria-hidden="true">
+              <span className="v2-vs-seal">VS</span>
+              <span className="v2-vs-mult" data-tone={matchupTone}>
+                {matchupMult > 1.01 ? '克制 ×1.25' : matchupMult < 0.99 ? '被克 ×0.80' : '均势 ×1.0'}
+              </span>
+            </div>
+
+            <div className="v2-duel-foe">
+              <div className="v2-enemy-head">
+                <div>
+                  <span className="v2-rubric">敌方 · {battle.enemy.def.kind === 'boss' ? 'BOSS' : '回响灵'}</span>
+                  <h3 className="v2-enemy-name">{battle.enemy.def.name}</h3>
+                </div>
+                <div className="v2-enemy-badges">
+                  <span className="v2-badge" data-kind="element" style={{ '--badge': enemyElement.color } as CSSProperties}>
+                    <i />
+                    {enemyElement.name}属性
+                  </span>
+                  <span className="v2-badge" data-kind="phase">阶段 {battle.enemy.phase}</span>
+                </div>
+              </div>
+              <div className="v2-duel-figure v2-enemy-art">
+                <span className="v2-duel-plinth" aria-hidden="true" />
+                <span className="v2-enemy-glyph" aria-hidden="true">{enemyElement.glyph}</span>
+                <MonsterSprite
+                  recipe={{
+                    shape: battle.enemy.def.kind === 'boss' ? 'shard' : 'blob',
+                    crest: ELEMENT_CREST[battle.enemy.def.element] ?? 'none',
+                    accessory: 'none',
+                    palette: ['#8FB6C6', enemyElement.color, '#E8F2F5'],
+                  }}
+                  mood={battle.enemy.hp <= battle.enemy.def.maxHp / 2 ? 'angry' : 'idle'}
+                  title={battle.enemy.def.name}
+                />
+                {supportFloats('enemy')}
+              </div>
               <Bar
                 value={battle.enemy.hp}
                 max={battle.enemy.def.maxHp}
@@ -302,24 +415,27 @@ export function BattleView2({
                 label="HP"
                 shield={battle.enemy.shield}
               />
-              <div className="v2-status-row">
-                {battle.enemy.shield > 0 ? <span className="v2-status">护盾 {battle.enemy.shield}</span> : null}
-                {battle.enemy.statuses.map((status) => (
-                  <span className="v2-status" key={status.id}>{statusText(status)}</span>
-                ))}
-              </div>
-              <div className="v2-intent" data-source={intent?.source ?? 'rule'}>
-                <div className="v2-intent-head">
-                  <span className="v2-rubric">下一步意图</span>
-                  <b>{ACTION_LABEL[intent?.action ?? 'strike']}</b>
-                  <span className="v2-intent-dmg">
-                    {intent && intent.estimate > 0 ? `预计 ${intent.estimate} 伤害` : '无直接伤害'}
-                  </span>
+              {battle.enemy.shield > 0 || battle.enemy.statuses.length > 0 ? (
+                <div className="v2-status-row">
+                  {battle.enemy.shield > 0 ? <span className="v2-status">护盾 {battle.enemy.shield}</span> : null}
+                  {battle.enemy.statuses.map((status) => (
+                    <span className="v2-status" key={status.id}>{statusText(status)}</span>
+                  ))}
                 </div>
-                <p className="v2-intent-text">{intent?.text ?? '观察中'}</p>
-                {intent?.reason ? <p className="v2-intent-reason">{intent.reason}</p> : null}
-              </div>
+              ) : null}
             </div>
+          </div>
+
+          <div className="v2-intent" data-source={intent?.source ?? 'rule'}>
+            <div className="v2-intent-head">
+              <span className="v2-rubric">敌方下一步意图</span>
+              <b>{ACTION_LABEL[intent?.action ?? 'strike']}</b>
+              <span className="v2-intent-dmg">
+                {intent && intent.estimate > 0 ? `预计 ${intent.estimate} 伤害` : '无直接伤害'}
+              </span>
+            </div>
+            <p className="v2-intent-text">{intent?.text ?? '观察中'}</p>
+            {intent?.reason ? <p className="v2-intent-reason">{intent.reason}</p> : null}
           </div>
           {aiNote ? <p className="v2-ai-note">{aiNote}</p> : null}
         </div>
@@ -327,6 +443,7 @@ export function BattleView2({
         <div className="v2-party-board">
           {battle.team.map((member, index) => {
             const memberShield = member.statuses.find((status) => status.id === 'shield')?.stacks ?? 0;
+            const supCmd = SUPPORT_BY_ID.get(member.creature.supportCommandId);
             return (
               <div
                 className="v2-member"
@@ -343,7 +460,7 @@ export function BattleView2({
                   <div className="v2-member-head">
                     <b>{member.creature.name}</b>
                     <span className="v2-badge" data-kind={index === battle.activeIndex ? 'active' : 'reserve'}>
-                      {index === battle.activeIndex ? '主战' : '支援'}
+                      {index === battle.activeIndex ? '出战中' : '支援'}
                     </span>
                     <span className="v2-member-path" style={{ color: PATH_META[member.creature.buildPath].color }}>
                       {PATH_META[member.creature.buildPath].name}
@@ -357,11 +474,15 @@ export function BattleView2({
                     shield={memberShield}
                   />
                   <div className="v2-status-row">
+                    {index !== battle.activeIndex && member.alive && supCmd ? (
+                      <span className="v2-status">
+                        支援：{supCmd.name}{member.supportCd > 0 ? `（冷却 ${member.supportCd}）` : ' · 就绪'}
+                      </span>
+                    ) : null}
                     {member.statuses.map((status) => (
                       <span className="v2-status" key={status.id}>{statusText(status)}</span>
                     ))}
                     {!member.alive ? <span className="v2-status" data-bad="true">倒下</span> : null}
-                    {member.supportCd > 0 ? <span className="v2-status">支援冷却 {member.supportCd}</span> : null}
                   </div>
                 </div>
               </div>
@@ -390,15 +511,18 @@ export function BattleView2({
               const disabled = cd > 0 || lacking > 0;
               const isDamage = module.effect.kind === 'damage' || module.effect.kind === 'control';
               const est = isDamage ? estimatePlayerSkillDamage(battle, skillId) : null;
+              const kindMeta = SKILL_KIND_META[module.kind] ?? SKILL_KIND_META.attack;
               return (
                 <button
                   type="button"
                   className="v2-skill"
+                  data-skill-kind={module.kind}
                   key={skillId}
                   onClick={() => onMain({ kind: 'skill', skillId })}
                   disabled={disabled || Boolean(battle.outcome)}
                 >
                   <span className="v2-skill-head">
+                    <span className="v2-badge" data-kind="skill-type">{kindMeta.icon} {kindMeta.label}</span>
                     <span className="v2-badge" data-kind="cost">{module.cost ? `共鸣 ${module.cost}` : '免费'}</span>
                     {module.power > 0 ? <span className="v2-badge" data-kind="power">威力 {module.power}</span> : null}
                     {est ? <span className="v2-badge" data-kind="estimate">预计 ~{est.damage} 伤害</span> : null}
@@ -419,12 +543,13 @@ export function BattleView2({
                 <button
                   type="button"
                   className="v2-skill v2-skill-basic"
+                  data-skill-kind="attack"
                   onClick={() => onMain({ kind: 'basic' })}
                   disabled={Boolean(battle.outcome)}
                 >
                   <span className="v2-skill-head">
+                    <span className="v2-badge" data-kind="skill-type">⚔ 普攻</span>
                     <span className="v2-badge" data-kind="cost">免费</span>
-                    <span className="v2-badge" data-kind="power">稳定</span>
                     <span className="v2-badge" data-kind="estimate">预计 ~{basicEst.damage} 伤害</span>
                   </span>
                   <b>普通攻击</b>
@@ -435,10 +560,12 @@ export function BattleView2({
             <button
               type="button"
               className="v2-skill v2-skill-guard"
+              data-skill-kind="guard"
               onClick={() => onMain({ kind: 'guard' })}
               disabled={!guardLegal || Boolean(battle.outcome)}
             >
               <span className="v2-skill-head">
+                <span className="v2-badge" data-kind="skill-type">🛡️ 防护</span>
                 <span className="v2-badge" data-kind="cost">共鸣 +1</span>
                 <span className="v2-badge" data-kind="power">减伤 50%</span>
               </span>

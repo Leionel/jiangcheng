@@ -223,6 +223,70 @@ function Accessory({
   return null;
 }
 
+const GUARD_LAYERS = new Set(['guard-ribs', 'steam-shield', 'seal-shield', 'keystone', 'rim', 'pack', 'fold', 'arch']);
+const STRIKE_LAYERS = new Set(['rain-blade', 'cannon', 'blade-petal', 'blade', 'spark', 'neon-coil', 'lock']);
+const CROWN_LAYERS = new Set(['canopy', 'thermos-cap', 'lamp-post', 'halo', 'lantern']);
+const AURA_LAYERS = new Set(['petal-cloud', 'healing-bloom', 'wake', 'tide', 'rain-lines', 'ink-swirl', 'pages', 'sesame-shell', 'hull']);
+
+function EvolutionEffects({
+  layers,
+  palette,
+  part,
+}: {
+  layers: string[];
+  palette: [string, string, string];
+  part: 'back' | 'front';
+}) {
+  if (layers.length === 0) return null;
+  const [, dark, light] = palette;
+  const hasGuard = layers.some((id) => GUARD_LAYERS.has(id));
+  const hasStrike = layers.some((id) => STRIKE_LAYERS.has(id));
+  const hasCrown = layers.some((id) => CROWN_LAYERS.has(id));
+  const hasAura = layers.some((id) => AURA_LAYERS.has(id));
+
+  if (part === 'back') {
+    return (
+      <g>
+        {/* 进化印章光环：一眼分辨高阶造物 */}
+        <circle cx="100" cy="108" r="78" fill="none" stroke={dark} strokeWidth="2.4" strokeDasharray="9 5" opacity="0.58" />
+        <circle cx="100" cy="108" r="68" fill="none" stroke={dark} strokeWidth="1.2" opacity="0.28" />
+        {hasStrike ? (
+          <g stroke={INK} strokeWidth="2.8" strokeLinejoin="round">
+            <polygon points="34,48 64,86 50,96 22,56" fill={dark} />
+            <polygon points="166,48 136,86 150,96 178,56" fill={dark} />
+            <path d="M26 70l18-10M174 70l-18-10" stroke={light} strokeWidth="2.4" strokeLinecap="round" />
+          </g>
+        ) : null}
+        {hasGuard ? (
+          <g stroke={INK} strokeWidth="2.8" strokeLinejoin="round">
+            <path d="M28 84 L48 74 L48 136 L28 124 Z" fill={light} />
+            <path d="M172 84 L152 74 L152 136 L172 124 Z" fill={light} />
+            <path d="M36 90v28M164 90v28" stroke={dark} strokeWidth="2.4" strokeLinecap="round" />
+          </g>
+        ) : null}
+      </g>
+    );
+  }
+
+  return (
+    <g>
+      {hasCrown ? (
+        <g stroke={INK} strokeWidth="2.6" strokeLinejoin="round">
+          <polygon points="82,42 90,22 100,34 110,22 118,42" fill={dark} />
+          <circle cx="100" cy="18" r="4" fill={light} />
+        </g>
+      ) : null}
+      {hasAura ? (
+        <g fill={dark} opacity="0.72">
+          <circle cx="34" cy="140" r="4" />
+          <circle cx="166" cy="140" r="4" />
+          <path d="M30 62l8-6-2 10zM170 62l-8-6 2 10z" />
+        </g>
+      ) : null}
+    </g>
+  );
+}
+
 export function MonsterSprite({
   recipe,
   mood = 'idle',
@@ -230,13 +294,14 @@ export function MonsterSprite({
   title,
   svgId,
 }: {
-  recipe: VisualRecipe;
+  recipe: VisualRecipe & { evolutionLayers?: string[] };
   mood?: Mood;
   className?: string;
   title?: string;
   svgId?: string;
 }) {
   const [main, dark, light] = recipe.palette;
+  const evoLayers = recipe.evolutionLayers ?? [];
 
   return (
     <svg
@@ -248,8 +313,9 @@ export function MonsterSprite({
       aria-label={title ?? '精灵插画'}
     >
       {/* 地面墨点 */}
-      <ellipse cx="100" cy="178" rx="50" ry="8" fill={dark} opacity="0.16" />
+      <ellipse cx="100" cy="178" rx={evoLayers.length ? 60 : 50} ry="8" fill={dark} opacity="0.18" />
 
+      <EvolutionEffects layers={evoLayers} palette={recipe.palette} part="back" />
       <Accessory kind={recipe.accessory} part="back" palette={recipe.palette} />
 
       {/* 套印错位：先印一层深墨，再压主色 */}
@@ -262,6 +328,7 @@ export function MonsterSprite({
       <Face mood={mood} />
 
       <Accessory kind={recipe.accessory} part="front" palette={recipe.palette} />
+      <EvolutionEffects layers={evoLayers} palette={recipe.palette} part="front" />
 
       {/* 高光：一小块纸白，像印漏的地方 */}
       <path
